@@ -561,7 +561,8 @@ const App = {
       }
 
       container.innerHTML = purgeHeader + accounts.map(acc => {
-        const isCurrent = currentUser && currentUser.uid === acc.uid;
+        const isMaster = AuthManager.isMasterEmail(acc.email);
+        const isCurrent = isMaster || (currentUser && currentUser.uid === acc.uid) || (currentUser && currentUser.email && currentUser.email.toLowerCase() === acc.email.toLowerCase());
         const status = acc.status || 'pending';
         let statusBadge = '<span class="status-pill pending">⏳ Pendente</span>';
         if (status === 'approved') statusBadge = '<span class="status-pill approved">🟢 Aprovado</span>';
@@ -572,7 +573,7 @@ const App = {
             <div class="account-info">
               <div class="account-name-row">
                 <span class="account-name">${this.escapeHtml(acc.displayName || 'Sem nome')}</span>
-                ${acc.role === 'admin' ? '<span style="font-size: 0.65rem; background: rgba(139, 92, 246, 0.2); color: #c084fc; padding: 2px 6px; border-radius: 4px; font-weight: 700;">ADMIN MASTER</span>' : ''}
+                ${isMaster ? '<span style="font-size: 0.65rem; background: rgba(139, 92, 246, 0.2); color: #c084fc; padding: 2px 6px; border-radius: 4px; font-weight: 700;">ADMIN MASTER 👑</span>' : ''}
                 ${isCurrent ? '<span style="font-size: 0.65rem; color: #38bdf8;">(Você)</span>' : ''}
               </div>
               <span class="account-email">${this.escapeHtml(acc.email)}</span>
@@ -580,23 +581,27 @@ const App = {
             </div>
 
             <div class="account-actions-group">
-              ${status !== 'approved' ? `
-                <button class="btn-acc-action btn-acc-approve" onclick="App.handleApproveAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}')">
-                  <span>✅ Aprovar</span>
-                </button>
-              ` : ''}
+              ${isMaster ? `
+                <span style="font-size: 0.72rem; color: #c084fc; font-weight: 700; background: rgba(139, 92, 246, 0.15); padding: 5px 12px; border-radius: 9999px; border: 1px solid rgba(139, 92, 246, 0.35);">
+                  👑 Conta Principal
+                </span>
+              ` : `
+                ${status !== 'approved' ? `
+                  <button class="btn-acc-action btn-acc-approve" onclick="App.handleApproveAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}')">
+                    <span>✅ Aprovar</span>
+                  </button>
+                ` : ''}
 
-              ${status === 'approved' && !isCurrent ? `
-                <button class="btn-acc-action btn-acc-block" onclick="App.handleBlockAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}')">
-                  <span>🚫 Bloquear</span>
-                </button>
-              ` : ''}
+                ${status === 'approved' ? `
+                  <button class="btn-acc-action btn-acc-block" onclick="App.handleBlockAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}')">
+                    <span>🚫 Bloquear</span>
+                  </button>
+                ` : ''}
 
-              ${!isCurrent ? `
                 <button class="btn-acc-action btn-acc-delete" onclick="App.handleDeleteAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}')">
                   <span>🗑️</span>
                 </button>
-              ` : ''}
+              `}
             </div>
           </div>
         `;

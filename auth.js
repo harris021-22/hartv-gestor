@@ -20,10 +20,7 @@ const AuthManager = {
 
   // Inicialização do Auth
   async init() {
-    // 1. Limpeza automática: garantir que apenas andrew.g.h.agh@gmail.com exista
-    this.purgeNonMasterAccounts();
-
-    // 2. Tentar restaurar sessão salva
+    // 1. Tentar restaurar sessão salva
     try {
       const savedSession = localStorage.getItem(this.CURRENT_USER_KEY);
       if (savedSession) {
@@ -172,6 +169,9 @@ const AuthManager = {
           } catch (e) {
             console.warn('Erro ao salvar em system_accounts:', e);
           }
+
+          // Salvar localmente também para garantir redundância total e exibição imediata
+          this.saveAccountLocally(accountData);
 
           // Se for usuário solicitante (não-master), desconectar imediatamente e bloquear entrada
           if (!isMaster) {
@@ -373,26 +373,41 @@ const AuthManager = {
   // LISTAR CONTAS PARA O ADMINISTRADOR MASTER APROVAR
   async getAccountsList() {
     const masterEmail = 'andrew.g.h.agh@gmail.com';
-    let list = [];
+    let cloudList = [];
 
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       try {
         const snap = await firebase.firestore().collection('system_accounts').get();
-        snap.forEach(doc => list.push(doc.data()));
+        snap.forEach(doc => {
+          if (doc.exists) cloudList.push(doc.data());
+        });
       } catch (e) {
         console.warn('Erro ao listar system_accounts no Firestore:', e);
       }
     }
 
-    if (list.length === 0) {
-      list = this.getLocalAccounts();
-    }
+    const localList = this.getLocalAccounts();
+
+    // Combinar contas da nuvem e contas locais sem duplicar por email
+    const map = new Map();
+    localList.forEach(acc => {
+      if (acc && acc.email) map.set(acc.email.toLowerCase(), acc);
+    });
+    cloudList.forEach(acc => {
+      if (acc && acc.email) {
+        const existing = map.get(acc.email.toLowerCase());
+        map.set(acc.email.toLowerCase(), { ...(existing || {}), ...acc });
+      }
+    });
+
+    const list = Array.from(map.values());
 
     // Garantir que Andrew Harris esteja sempre presente na lista como ADMIN MASTER
+    const masterUid = (this.currentUser && this.currentUser.uid) ? this.currentUser.uid : 'usr_master_agh';
     const hasMaster = list.some(a => a.email && a.email.toLowerCase() === masterEmail);
     if (!hasMaster) {
       list.unshift({
-        uid: 'usr_master_agh',
+        uid: masterUid,
         displayName: 'Andrew Harris',
         email: masterEmail,
         status: 'approved',
@@ -406,12 +421,26 @@ const AuthManager = {
       if (a.email && a.email.toLowerCase() === masterEmail) {
         a.role = 'admin';
         a.status = 'approved';
+        a.uid = masterUid;
       } else {
         a.role = 'user';
       }
     });
 
     return list;
+  },
+
+  // Salvar conta localmente com mesclagem
+  saveAccountLocally(accountData) {
+    if (!accountData || !accountData.email) return;
+    const accounts = this.getLocalAccounts();
+    const idx = accounts.findIndex(a => a.email && a.email.toLowerCase() === accountData.email.toLowerCase());
+    if (idx !== -1) {
+      accounts[idx] = { ...accounts[idx], ...accountData };
+    } else {
+      accounts.push(accountData);
+    }
+    this.saveLocalAccounts(accounts);
   },
 
   // APROVAR OU BLOQUEAR CONTA
@@ -429,7 +458,7 @@ const AuthManager = {
 
     // Atualizar localmente
     const accounts = this.getLocalAccounts();
-    const idx = accounts.findIndex(a => a.uid === uid);
+    const idx = accounts.findIndex(a => a.uid === uid || a.email === uid);
     if (idx !== -1) {
       accounts[idx].status = newStatus;
       this.saveLocalAccounts(accounts);
@@ -448,7 +477,7 @@ const AuthManager = {
     }
 
     const accounts = this.getLocalAccounts();
-    const filtered = accounts.filter(a => a.uid !== uid);
+    const filtered = accounts.filter(a => a.uid !== uid && a.email !== uid);
     this.saveLocalAccounts(filtered);
     return true;
   },
