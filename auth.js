@@ -255,7 +255,12 @@ const AuthManager = {
             this.currentUser = null;
             localStorage.removeItem(this.CURRENT_USER_KEY);
             this.notifyListeners();
-            throw new Error('⏳ Sua solicitação foi enviada com sucesso! O acesso está bloqueado até que o administrador (andrew.g.h.agh@gmail.com) aprove o seu cadastro.');
+            return {
+              success: true,
+              pending: true,
+              user: accountData,
+              message: 'Sua solicitação de acesso foi enviada com sucesso! O administrador (andrew.g.h.agh@gmail.com) precisa aprovar seu cadastro.'
+            };
           }
 
           this.currentUser = {
@@ -268,7 +273,12 @@ const AuthManager = {
           };
           localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
           this.notifyListeners();
-          return this.currentUser;
+          return {
+            success: true,
+            pending: false,
+            user: this.currentUser,
+            message: 'Administrador conectado!'
+          };
         }
       } catch (fbErr) {
         throw new Error(this.translateFirebaseError(fbErr));
@@ -279,7 +289,7 @@ const AuthManager = {
     const accounts = this.getLocalAccounts();
     const existing = accounts.find(a => a.email && a.email.toLowerCase() === cleanEmail);
     if (existing) {
-      throw new Error('Já existe uma conta cadastrada com este e-mail.');
+      throw new Error('Este e-mail já possui cadastro. Se você já solicitou, aguarde a liberação do administrador (andrew.g.h.agh@gmail.com) ou tente fazer login.');
     }
 
     const uid = 'usr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
@@ -301,7 +311,12 @@ const AuthManager = {
       this.currentUser = null;
       localStorage.removeItem(this.CURRENT_USER_KEY);
       this.notifyListeners();
-      throw new Error('⏳ Sua solicitação foi enviada com sucesso! O acesso está bloqueado até que o administrador (andrew.g.h.agh@gmail.com) aprove o seu cadastro.');
+      return {
+        success: true,
+        pending: true,
+        user: newAccount,
+        message: 'Sua solicitação de acesso foi enviada com sucesso! O administrador (andrew.g.h.agh@gmail.com) precisa aprovar seu cadastro.'
+      };
     }
 
     this.currentUser = {
@@ -315,7 +330,12 @@ const AuthManager = {
 
     localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
     this.notifyListeners();
-    return this.currentUser;
+    return {
+      success: true,
+      pending: false,
+      user: this.currentUser,
+      message: 'Administrador conectado!'
+    };
   },
 
   // LOGIN COM VERIFICAÇÃO DE APROVAÇÃO
@@ -770,7 +790,7 @@ const AuthManager = {
     const code = error.code || '';
     switch (code) {
       case 'auth/email-already-in-use':
-        return 'Este e-mail já foi solicitado ou está em uso.';
+        return 'Este e-mail já possui cadastro. Se você já solicitou, aguarde a liberação do administrador (andrew.g.h.agh@gmail.com) ou tente fazer login.';
       case 'auth/invalid-email':
         return 'O endereço de e-mail informado é inválido.';
       case 'auth/weak-password':

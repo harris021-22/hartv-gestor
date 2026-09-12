@@ -15,7 +15,7 @@
 
   <!-- Manifest e Ícones -->
   <link rel="manifest" href="./manifest.json">
-  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+  <link rel="icon" type="image/png" href="./icons/icon-64.png">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
 
   <!-- Estilos -->
@@ -277,11 +277,8 @@
   <!-- Header Superior -->
   <header class="app-header">
     <div class="brand-container">
-      <div class="brand-logo">
-        <svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="512" height="512" rx="100" fill="#0f172a" stroke="#06b6d4" stroke-width="12" />
-          <polygon points="200,160 200,352 352,256" fill="#06b6d4" />
-        </svg>
+      <div class="brand-logo" style="overflow: hidden; background: transparent; box-shadow: none;">
+        <img src="./icons/icon-192.png" alt="HarTv Logo" style="width: 100%; height: 100%; object-fit: cover; border-radius: 10px;">
       </div>
       <div>
         <h1 class="brand-title">HarTv Gestor</h1>
@@ -754,24 +751,21 @@
   <div id="authScreen" class="auth-overlay" style="display: none;">
     <div class="auth-card">
       <div class="auth-brand">
-        <div class="brand-logo" style="width: 52px; height: 52px; margin: 0 auto 10px;">
-          <svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="512" height="512" rx="100" fill="#0f172a" stroke="#06b6d4" stroke-width="12" />
-            <polygon points="200,160 200,352 352,256" fill="#06b6d4" />
-          </svg>
+        <div class="brand-logo" style="width: 76px; height: 76px; margin: 0 auto 12px; background: transparent; box-shadow: none;">
+          <img src="./icons/logo.png" alt="HarTv Gestor" style="width: 100%; height: 100%; object-fit: contain; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);">
         </div>
-        <h1 class="brand-title" style="font-size: 1.4rem; text-align: center;">HarTv Gestor</h1>
+        <h1 class="brand-title" style="font-size: 1.45rem; text-align: center;">HarTv Gestor</h1>
         <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 4px;">Acesso seguro e isolado ao painel</p>
       </div>
 
       <!-- Abas Entrar / Criar Conta -->
       <div class="auth-tabs">
-        <button type="button" id="tabLoginBtn" class="auth-tab active">Entrar</button>
-        <button type="button" id="tabRegisterBtn" class="auth-tab">Criar Conta</button>
+        <button type="button" id="tabLoginBtn" class="auth-tab active" onclick="App.switchAuthTab('login')">Entrar</button>
+        <button type="button" id="tabRegisterBtn" class="auth-tab" onclick="App.switchAuthTab('register')">Criar Conta</button>
       </div>
 
       <!-- Form Login -->
-      <form id="formLogin" class="auth-form">
+      <form id="formLogin" class="auth-form" onsubmit="App.handleLoginSubmit(event)">
         <div class="form-group">
           <label class="form-label" for="loginEmail">E-mail ou Usuário</label>
           <input type="email" id="loginEmail" class="form-input" placeholder="seuemail@exemplo.com" required autocomplete="email">
@@ -789,7 +783,7 @@
       </form>
 
       <!-- Form Cadastro -->
-      <form id="formRegister" class="auth-form" style="display: none;">
+      <form id="formRegister" class="auth-form" style="display: none;" onsubmit="App.handleRegisterSubmit(event)">
         <div class="form-group">
           <label class="form-label" for="regName">Seu Nome Completo</label>
           <input type="text" id="regName" class="form-input" placeholder="Ex: Carlos Silva" required autocomplete="name">
@@ -803,7 +797,7 @@
           <input type="password" id="regPassword" class="form-input" placeholder="Mínimo 6 caracteres" minlength="6" required autocomplete="new-password">
         </div>
         <button type="submit" id="btnRegisterSubmit" class="btn btn-success" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
-          <span>✨ Solicitar Acesso</span>
+          <span>✨ Criar Conta (Solicitar Acesso)</span>
         </button>
       </form>
 
@@ -867,11 +861,11 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <!-- Scripts da Aplicação -->
-  <script src="./firebase-config.js?v=5.0"></script>
-  <script src="./auth.js?v=5.0"></script>
-  <script src="./database.js?v=5.0"></script>
-  <script src="./storage.js?v=5.0"></script>
-  <script src="./notifications.js?v=5.0"></script>
-  <script src="./app.js?v=5.0"></script>
+  <script src="./firebase-config.js?v=6.0"></script>
+  <script src="./auth.js?v=6.0"></script>
+  <script src="./database.js?v=6.0"></script>
+  <script src="./storage.js?v=6.0"></script>
+  <script src="./notifications.js?v=6.0"></script>
+  <script src="./app.js?v=6.0"></script>
 </body>
 </html>

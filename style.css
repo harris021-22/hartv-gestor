@@ -95,9 +95,12 @@ body {
   justify-content: center;
 }
 
-.brand-logo svg {
+.brand-logo svg,
+.brand-logo img {
   width: 100%;
   height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
 }
 
 .brand-title {

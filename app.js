@@ -692,46 +692,119 @@ const App = {
     }
   },
 
+  // Alternar entre abas Entrar e Criar Conta
+  switchAuthTab(tab) {
+    const tabLoginBtn = document.getElementById('tabLoginBtn');
+    const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+    const formLogin = document.getElementById('formLogin');
+    const formRegister = document.getElementById('formRegister');
+
+    if (tab === 'register') {
+      if (tabRegisterBtn) tabRegisterBtn.classList.add('active');
+      if (tabLoginBtn) tabLoginBtn.classList.remove('active');
+      if (formRegister) formRegister.style.display = 'flex';
+      if (formLogin) formLogin.style.display = 'none';
+      const regName = document.getElementById('regName');
+      if (regName) regName.focus();
+    } else {
+      if (tabLoginBtn) tabLoginBtn.classList.add('active');
+      if (tabRegisterBtn) tabRegisterBtn.classList.remove('active');
+      if (formLogin) formLogin.style.display = 'flex';
+      if (formRegister) formRegister.style.display = 'none';
+      const loginEmail = document.getElementById('loginEmail');
+      if (loginEmail) loginEmail.focus();
+    }
+  },
+
   // Submit de Login
   async handleLoginSubmit(e) {
-    e.preventDefault();
-    const email = document.getElementById('loginEmail').value.trim();
-    const pass = document.getElementById('loginPassword').value.trim();
+    if (e && e.preventDefault) e.preventDefault();
+    const emailInput = document.getElementById('loginEmail');
+    const passInput = document.getElementById('loginPassword');
+    const email = emailInput ? emailInput.value.trim() : '';
+    const pass = passInput ? passInput.value.trim() : '';
     const submitBtn = document.getElementById('btnLoginSubmit');
 
+    if (!email || !pass) {
+      alert('Por favor, informe seu e-mail e sua senha.');
+      return;
+    }
+
+    const originalText = submitBtn ? submitBtn.innerHTML : '';
+
     try {
-      if (submitBtn) submitBtn.disabled = true;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>⏳ Conectando...</span>';
+      }
       const user = await AuthManager.login(email, pass);
       this.showToast(`Bem-vindo, ${user.displayName}!`, 'success');
-      document.getElementById('formLogin').reset();
+      const form = document.getElementById('formLogin');
+      if (form) form.reset();
     } catch (err) {
       alert(err.message || 'Erro ao realizar login.');
     } finally {
-      if (submitBtn) submitBtn.disabled = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText || '<span>🚀 Entrar no Painel</span>';
+      }
     }
   },
 
   // Submit de Cadastro / Solicitação de Acesso
   async handleRegisterSubmit(e) {
-    e.preventDefault();
-    const name = document.getElementById('regName').value.trim();
-    const email = document.getElementById('regEmail').value.trim();
-    const pass = document.getElementById('regPassword').value.trim();
+    if (e && e.preventDefault) e.preventDefault();
+    const nameInput = document.getElementById('regName');
+    const emailInput = document.getElementById('regEmail');
+    const passInput = document.getElementById('regPassword');
+    const name = nameInput ? nameInput.value.trim() : '';
+    const email = emailInput ? emailInput.value.trim() : '';
+    const pass = passInput ? passInput.value.trim() : '';
     const submitBtn = document.getElementById('btnRegisterSubmit');
 
+    if (!name || !email || !pass) {
+      alert('Por favor, preencha todos os campos (Nome, E-mail e Senha).');
+      return;
+    }
+
+    if (pass.length < 6) {
+      alert('A senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
+
+    const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+
     try {
-      if (submitBtn) submitBtn.disabled = true;
-      const user = await AuthManager.register(name, email, pass);
-      this.showToast(`Bem-vindo, ${user.displayName}!`, 'success');
-      document.getElementById('formRegister').reset();
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>⏳ Criando e enviando solicitação...</span>';
+      }
+
+      const result = await AuthManager.register(name, email, pass);
+
+      if (result && result.pending) {
+        alert('🎉 Sua solicitação foi enviada com sucesso!\n\nSeu cadastro foi recebido e está aguardando a liberação do administrador (andrew.g.h.agh@gmail.com).\n\nAssim que for aprovado, basta entrar com seu e-mail e senha.');
+        const formReg = document.getElementById('formRegister');
+        if (formReg) formReg.reset();
+
+        // Preenche o e-mail na tela de login para facilitar o acesso
+        const loginEmail = document.getElementById('loginEmail');
+        if (loginEmail) loginEmail.value = email;
+
+        // Alterna para a aba de login
+        this.switchAuthTab('login');
+      } else {
+        this.showToast(`Bem-vindo, ${result.user ? result.user.displayName : name}!`, 'success');
+        const formReg = document.getElementById('formRegister');
+        if (formReg) formReg.reset();
+      }
     } catch (err) {
       alert(err.message || 'Erro ao processar cadastro.');
-      document.getElementById('formRegister').reset();
-      // Alternar para a aba de login para facilitar o fluxo do usuário
-      const tabLoginBtn = document.getElementById('tabLoginBtn');
-      if (tabLoginBtn) tabLoginBtn.click();
     } finally {
-      if (submitBtn) submitBtn.disabled = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText || '<span>✨ Criar Conta (Solicitar Acesso)</span>';
+      }
     }
   },
 
