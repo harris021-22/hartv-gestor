@@ -52,34 +52,72 @@
       <div id="userProfileChip" class="user-chip" style="display: none;" title="Conta Ativa">
         <span class="user-avatar" id="userAvatarText">A</span>
         <span class="user-name-text" id="userNameText">admin</span>
-        <button id="btnLogout" class="logout-btn" title="Trocar de Conta / Sair">
-          <span>🚪 Sair</span>
-        </button>
       </div>
 
-      <!-- Botão Gerenciar Contas / Aprovações (Admin) -->
-      <button id="btnManageAccounts" class="icon-btn" title="Aprovações e Contas" style="display: none;">
-        <span>👥</span>
-        <span id="pendingBadge" class="badge-dot" style="display: none; background: #f59e0b; box-shadow: 0 0 8px #f59e0b;"></span>
-      </button>
-
-      <!-- Botão Notificações -->
-      <button id="btnNotifications" class="icon-btn" title="Notificações e Alertas">
-        <span>🔔</span>
-        <span id="notifBadge" class="badge-dot" style="display: none;"></span>
-      </button>
-
-      <!-- Botão Backup (Exportar / Importar) -->
-      <button id="btnBackup" class="icon-btn" title="Backup (Exportar / Importar)">
-        <span>💾</span>
-      </button>
-
-      <!-- Botão Configurações -->
-      <button id="btnSettings" class="icon-btn" title="Configurações e Chave Pix">
-        <span>⚙️</span>
+      <!-- Botão Menu Hambúrguer -->
+      <button id="btnHamburger" class="icon-btn hamburger-btn" title="Abrir Menu">
+        <span style="font-size: 1.3rem; line-height: 1;">☰</span>
+        <span id="drawerBadge" class="badge-dot" style="display: none; background: #f59e0b; box-shadow: 0 0 8px #f59e0b;"></span>
       </button>
     </div>
   </header>
+
+  <!-- MENU LATERAL DESLIZANTE (DRAWER HAMBÚRGUER) -->
+  <div id="drawerOverlay" class="drawer-overlay">
+    <div id="drawerMenu" class="drawer-content">
+      <div class="drawer-header">
+        <div class="drawer-user-card">
+          <div class="drawer-user-avatar" id="drawerAvatar">A</div>
+          <div class="drawer-user-details">
+            <div class="drawer-user-name" id="drawerUserName">Carregando...</div>
+            <div class="drawer-user-email" id="drawerUserEmail">...</div>
+            <div id="drawerUserBadge" class="drawer-role-badge">ADMIN MASTER 👑</div>
+          </div>
+        </div>
+        <button id="btnCloseDrawer" class="drawer-close-btn">&times;</button>
+      </div>
+
+      <div class="drawer-body">
+        <!-- Item: Aprovações de Contas (Apenas Admin) -->
+        <button id="drawerItemApprovals" class="drawer-item admin-item" style="display: none;">
+          <span class="drawer-item-icon">👥</span>
+          <span class="drawer-item-label">Aprovações de Contas</span>
+          <span id="drawerPendingCount" class="drawer-counter-badge" style="display: none;">0</span>
+        </button>
+
+        <!-- Item: Notificações -->
+        <button id="drawerItemNotifications" class="drawer-item">
+          <span class="drawer-item-icon">🔔</span>
+          <span class="drawer-item-label">Notificações &amp; Alertas</span>
+        </button>
+
+        <!-- Item: Backup & Dados -->
+        <button id="drawerItemBackup" class="drawer-item">
+          <span class="drawer-item-icon">💾</span>
+          <span class="drawer-item-label">Backup &amp; Dados (JSON)</span>
+        </button>
+
+        <!-- Item: Configurações & Pix -->
+        <button id="drawerItemSettings" class="drawer-item">
+          <span class="drawer-item-icon">⚙️</span>
+          <span class="drawer-item-label">Configurações &amp; Pix</span>
+        </button>
+
+        <!-- Item: Checar Vencimentos Agora -->
+        <button id="drawerItemCheckExp" class="drawer-item">
+          <span class="drawer-item-icon">🔄</span>
+          <span class="drawer-item-label">Checar Vencimentos Agora</span>
+        </button>
+      </div>
+
+      <div class="drawer-footer">
+        <button id="drawerBtnLogout" class="drawer-logout-btn">
+          <span>🚪</span>
+          <span>Sair da Conta (Logout)</span>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Conteúdo Principal -->
   <main class="main-container">

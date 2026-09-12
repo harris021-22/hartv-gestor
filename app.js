@@ -312,7 +312,7 @@ const App = {
       });
     }
 
-    // Botão de Gestão de Contas (Admin Master)
+    // Botão de Gestão de Contas (Admin Master - legado/compatibilidade)
     const btnManageAccounts = document.getElementById('btnManageAccounts');
     if (btnManageAccounts) {
       btnManageAccounts.addEventListener('click', () => {
@@ -323,6 +323,98 @@ const App = {
         }
       });
     }
+
+    // Controle do Menu Lateral Deslizante (Hambúrguer)
+    const btnHamburger = document.getElementById('btnHamburger');
+    if (btnHamburger) {
+      btnHamburger.addEventListener('click', () => this.openDrawer());
+    }
+
+    const userProfileChip = document.getElementById('userProfileChip');
+    if (userProfileChip) {
+      userProfileChip.addEventListener('click', () => this.openDrawer());
+    }
+
+    const btnCloseDrawer = document.getElementById('btnCloseDrawer');
+    if (btnCloseDrawer) {
+      btnCloseDrawer.addEventListener('click', () => this.closeDrawer());
+    }
+
+    const drawerOverlay = document.getElementById('drawerOverlay');
+    if (drawerOverlay) {
+      drawerOverlay.addEventListener('click', (e) => {
+        if (e.target === drawerOverlay) this.closeDrawer();
+      });
+    }
+
+    // Ações dos Itens do Menu Drawer
+    const drawerItemApprovals = document.getElementById('drawerItemApprovals');
+    if (drawerItemApprovals) {
+      drawerItemApprovals.addEventListener('click', () => {
+        this.closeDrawer();
+        const modal = document.getElementById('manageAccountsModal');
+        if (modal) {
+          modal.classList.add('open');
+          this.renderAccountsList();
+        }
+      });
+    }
+
+    const drawerItemNotifications = document.getElementById('drawerItemNotifications');
+    if (drawerItemNotifications) {
+      drawerItemNotifications.addEventListener('click', () => {
+        this.closeDrawer();
+        this.handleNotificationButton();
+      });
+    }
+
+    const drawerItemBackup = document.getElementById('drawerItemBackup');
+    if (drawerItemBackup) {
+      drawerItemBackup.addEventListener('click', () => {
+        this.closeDrawer();
+        this.openBackupModal();
+      });
+    }
+
+    const drawerItemSettings = document.getElementById('drawerItemSettings');
+    if (drawerItemSettings) {
+      drawerItemSettings.addEventListener('click', () => {
+        this.closeDrawer();
+        this.openSettingsModal();
+      });
+    }
+
+    const drawerItemCheckExp = document.getElementById('drawerItemCheckExp');
+    if (drawerItemCheckExp) {
+      drawerItemCheckExp.addEventListener('click', () => {
+        this.closeDrawer();
+        NotificationManager.checkExpirations(this.clients, true);
+        this.showToast('Vencimentos verificados com sucesso!', 'info');
+      });
+    }
+
+    const drawerBtnLogout = document.getElementById('drawerBtnLogout');
+    if (drawerBtnLogout) {
+      drawerBtnLogout.addEventListener('click', () => {
+        this.closeDrawer();
+        this.handleLogout();
+      });
+    }
+  },
+
+  // Abrir Menu Lateral Drawer
+  openDrawer() {
+    const drawer = document.getElementById('drawerOverlay');
+    if (drawer) drawer.classList.add('open');
+    if (typeof AuthManager !== 'undefined' && AuthManager.isAdmin()) {
+      this.checkPendingAccounts();
+    }
+  },
+
+  // Fechar Menu Lateral Drawer
+  closeDrawer() {
+    const drawer = document.getElementById('drawerOverlay');
+    if (drawer) drawer.classList.remove('open');
   },
 
   // Gerenciamento do estado da autenticação (UI)
@@ -333,29 +425,60 @@ const App = {
     const userNameText = document.getElementById('userNameText');
     const btnManageAccounts = document.getElementById('btnManageAccounts');
 
+    // Elementos do Menu Hambúrguer Drawer
+    const drawerAvatar = document.getElementById('drawerAvatar');
+    const drawerUserName = document.getElementById('drawerUserName');
+    const drawerUserEmail = document.getElementById('drawerUserEmail');
+    const drawerUserBadge = document.getElementById('drawerUserBadge');
+    const drawerItemApprovals = document.getElementById('drawerItemApprovals');
+    const drawerBadge = document.getElementById('drawerBadge');
+
     if (!user) {
       // Usuário deslogado: exibir tela de login
       if (authScreen) authScreen.style.display = 'flex';
       if (userChip) userChip.style.display = 'none';
       if (btnManageAccounts) btnManageAccounts.style.display = 'none';
+      if (drawerItemApprovals) drawerItemApprovals.style.display = 'none';
+      if (drawerBadge) drawerBadge.style.display = 'none';
+      this.closeDrawer();
       this.clients = [];
       this.render();
     } else {
       // Usuário logado: esconder tela de login e mostrar app
       if (authScreen) authScreen.style.display = 'none';
+      
+      const name = user.displayName || user.email.split('@')[0];
+      const initial = name.charAt(0).toUpperCase();
+
       if (userChip) {
         userChip.style.display = 'flex';
-        const name = user.displayName || user.email.split('@')[0];
-        if (userAvatarText) userAvatarText.textContent = name.charAt(0).toUpperCase();
+        if (userAvatarText) userAvatarText.textContent = initial;
         if (userNameText) userNameText.textContent = name;
       }
 
-      // Exibir botão de aprovações se for administrador
+      // Preencher dados do usuário no menu Drawer
+      if (drawerAvatar) drawerAvatar.textContent = initial;
+      if (drawerUserName) drawerUserName.textContent = name;
+      if (drawerUserEmail) drawerUserEmail.textContent = user.email;
+
+      const isAdmin = AuthManager.isAdmin();
+      if (drawerUserBadge) {
+        drawerUserBadge.style.display = isAdmin ? 'inline-block' : 'none';
+        drawerUserBadge.textContent = 'ADMIN MASTER 👑';
+      }
+
+      // Exibir item de aprovações apenas para o Administrador Master
+      if (drawerItemApprovals) {
+        drawerItemApprovals.style.display = isAdmin ? 'flex' : 'none';
+      }
       if (btnManageAccounts) {
-        btnManageAccounts.style.display = AuthManager.isAdmin() ? 'flex' : 'none';
-        if (AuthManager.isAdmin()) {
-          this.checkPendingAccounts();
-        }
+        btnManageAccounts.style.display = isAdmin ? 'flex' : 'none';
+      }
+
+      if (isAdmin) {
+        this.checkPendingAccounts();
+      } else {
+        if (drawerBadge) drawerBadge.style.display = 'none';
       }
 
       // Carregar os clientes específicos desta conta
@@ -368,11 +491,28 @@ const App = {
     try {
       const accounts = await AuthManager.getAccountsList();
       const pendingCount = accounts.filter(a => a.status === 'pending').length;
+
+      // Atualizar badge do botão legado (se existir)
       const pendingBadge = document.getElementById('pendingBadge');
       if (pendingBadge) {
         pendingBadge.style.display = pendingCount > 0 ? 'block' : 'none';
       }
-    } catch (e) {}
+
+      // Atualizar ponto indicador no botão hambúrguer do header
+      const drawerBadge = document.getElementById('drawerBadge');
+      if (drawerBadge) {
+        drawerBadge.style.display = pendingCount > 0 ? 'block' : 'none';
+      }
+
+      // Atualizar badge numérica dentro do menu hambúrguer
+      const drawerPendingCount = document.getElementById('drawerPendingCount');
+      if (drawerPendingCount) {
+        drawerPendingCount.textContent = pendingCount;
+        drawerPendingCount.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+      }
+    } catch (e) {
+      console.warn('Erro ao verificar contas pendentes:', e);
+    }
   },
 
   // Renderizar Lista de Contas para Aprovação
@@ -504,6 +644,7 @@ const App = {
   // Sair da Conta (Logout)
   async handleLogout() {
     if (confirm('Deseja realmente sair da sua conta?')) {
+      this.closeDrawer();
       await AuthManager.logout();
       this.showToast('Você saiu da sua conta.', 'info');
     }
