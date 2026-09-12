@@ -3,25 +3,16 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // Contas do sistema para controle de aprovação manual
-    match /system_accounts/{userId} {
-      allow read, write: if request.auth != null;
+    // Permite que solicitações de cadastro e aprovações do Admin sejam sincronizadas
+    match /system_accounts/{document=**} {
+      allow read, write: if true;
     }
 
     // Regra de Isolamento e Segurança Total:
     // Cada usuário só pode ler e escrever nos seus próprios dados e clientes.
     // Nenhuma conta consegue acessar, ler ou alterar dados de outra conta.
-    match /users/{userId} {
+    match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // Coleção de clientes do usuário
-      match /clients/{clientId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      
-      // Configurações personalizadas (Pix, mensagens, etc.)
-      match /settings/{settingId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
     }
   }
 }

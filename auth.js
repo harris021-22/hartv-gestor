@@ -659,6 +659,9 @@ const AuthManager = {
     this.saveLocalAccounts(accounts);
 
     if (firestoreError) {
+      if (firestoreError.message && firestoreError.message.includes('permission')) {
+        throw new Error(`Permissão negada no Firebase Cloud (Missing or insufficient permissions).\n\nAs Regras de Segurança do Firestore no seu Console do Firebase precisam ser publicadas para permitir a sincronização das contas.\n\nVeja as instruções na conversa para publicar a regra em 1 minuto.`);
+      }
       throw new Error(`Status gravado localmente, mas a sincronização na nuvem (Firestore) falhou: ${firestoreError.message}`);
     }
 
