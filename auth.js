@@ -1,11 +1,21 @@
-// auth.js - Sistema de Autenticação e Gestão de Múltiplas Contas
-// Suporta Firebase Auth e Gerenciador Local Multi-Contas Blindado
+// auth.js - Sistema de Autenticação, Recuperação de Senha e Aprovação Manual de Contas
+// Suporta Firebase Auth e Gerenciador Multi-Contas Blindado
 
 const AuthManager = {
   CURRENT_USER_KEY: 'hartv_current_user_session',
   LOCAL_USERS_KEY: 'hartv_registered_accounts',
   currentUser: null,
   authListeners: [],
+
+  // E-mail do Administrador Master Principal
+  MASTER_ADMIN_EMAILS: [
+    'andrew.g.h.agh@gmail.com'
+  ],
+
+  isMasterEmail(email) {
+    if (!email) return false;
+    return this.MASTER_ADMIN_EMAILS.includes(String(email).trim().toLowerCase());
+  },
 
   // Inicialização do Auth
   async init() {
@@ -14,6 +24,10 @@ const AuthManager = {
       const savedSession = localStorage.getItem(this.CURRENT_USER_KEY);
       if (savedSession) {
         this.currentUser = JSON.parse(savedSession);
+        if (this.isMasterEmail(this.currentUser.email)) {
+          this.currentUser.role = 'admin';
+          this.currentUser.status = 'approved';
+        }
       }
     } catch (e) {
       console.error('Erro ao ler sessão salva:', e);
@@ -26,17 +40,36 @@ const AuthManager = {
         if (!firebase.apps.length) {
           firebase.initializeApp(firebaseConfig);
         }
-        firebase.auth().onAuthStateChanged((user) => {
+        firebase.auth().onAuthStateChanged(async (user) => {
           if (user) {
+            const isMaster = this.isMasterEmail(user.email);
+            let status = 'approved';
+            let role = isMaster ? 'admin' : 'user';
+
+            if (!isMaster) {
+              const accountDoc = await this.getCloudAccountDoc(user.uid);
+              status = accountDoc ? accountDoc.status : 'pending';
+              role = accountDoc ? accountDoc.role : 'user';
+
+              if (status === 'pending') {
+                await firebase.auth().signOut();
+                this.currentUser = null;
+                localStorage.removeItem(this.CURRENT_USER_KEY);
+                this.notifyListeners();
+                return;
+              }
+            }
+
             this.currentUser = {
               uid: user.uid,
               email: user.email,
               displayName: user.displayName || user.email.split('@')[0],
+              status: status,
+              role: role,
               isCloud: true
             };
             localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
           } else {
-            // Se deslogou no Firebase
             if (this.currentUser && this.currentUser.isCloud) {
               this.currentUser = null;
               localStorage.removeItem(this.CURRENT_USER_KEY);
@@ -50,25 +83,25 @@ const AuthManager = {
       }
     }
 
-    // Notificar ouvintes do estado atual
     this.notifyListeners();
   },
 
-  // Obter usuário logado atual
   getUser() {
     return this.currentUser;
   },
 
-  // Verificar se está logado
   isLoggedIn() {
     return this.currentUser !== null;
   },
 
-  // Registrar ouvinte de mudança de login/logout
+  isAdmin() {
+    if (!this.currentUser) return false;
+    return this.isMasterEmail(this.currentUser.email) || this.currentUser.role === 'admin';
+  },
+
   onAuthStateChanged(callback) {
     if (typeof callback === 'function') {
       this.authListeners.push(callback);
-      // Disparar imediatamente com o estado atual
       callback(this.currentUser);
     }
   },
@@ -79,7 +112,7 @@ const AuthManager = {
     });
   },
 
-  // CADASTRO DE NOVA CONTA
+  // CADASTRO COM APROVAÇÃO MANUAL
   async register(displayName, email, password) {
     const cleanEmail = String(email || '').trim().toLowerCase();
     const cleanPass = String(password || '').trim();
@@ -98,10 +131,41 @@ const AuthManager = {
         const cred = await firebase.auth().createUserWithEmailAndPassword(cleanEmail, cleanPass);
         if (cred.user) {
           await cred.user.updateProfile({ displayName: cleanName });
+
+          // Verificar se é o email do Master Admin ou primeira conta
+          const isMaster = this.isMasterEmail(cleanEmail);
+          const allAccs = await this.getAccountsList();
+          const isFirstAccount = allAccs.length <= 1;
+          const initialStatus = (isMaster || isFirstAccount) ? 'approved' : 'pending';
+          const initialRole = (isMaster || isFirstAccount) ? 'admin' : 'user';
+
+          // Salvar metadados da conta para aprovação
+          const accountData = {
+            uid: cred.user.uid,
+            email: cleanEmail,
+            displayName: cleanName,
+            status: initialStatus,
+            role: initialRole,
+            createdAt: new Date().toISOString()
+          };
+
+          try {
+            await firebase.firestore().collection('system_accounts').doc(cred.user.uid).set(accountData, { merge: true });
+          } catch (e) {
+            console.warn('Erro ao salvar em system_accounts:', e);
+          }
+
+          if (initialStatus === 'pending') {
+            await firebase.auth().signOut();
+            throw new Error('⏳ Sua conta foi cadastrada com sucesso! Ela está aguardando a aprovação manual do administrador para ser liberada.');
+          }
+
           this.currentUser = {
             uid: cred.user.uid,
             email: cred.user.email,
             displayName: cleanName,
+            status: initialStatus,
+            role: initialRole,
             isCloud: true
           };
           localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
@@ -113,30 +177,39 @@ const AuthManager = {
       }
     }
 
-    // MODO LOCAL MULTI-CONTAS
+    // MODO LOCAL MULTI-CONTAS COM APROVAÇÃO MANUAL
     const accounts = this.getLocalAccounts();
     const existing = accounts.find(a => a.email === cleanEmail);
     if (existing) {
       throw new Error('Já existe uma conta cadastrada com este e-mail.');
     }
 
-    // Gerar UID único para a conta
+    const isMaster = this.isMasterEmail(cleanEmail);
+    const isFirst = accounts.length === 0;
     const uid = 'usr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
     const newAccount = {
       uid,
       displayName: cleanName,
       email: cleanEmail,
       passwordHash: this.simpleHash(cleanPass),
+      status: (isMaster || isFirst) ? 'approved' : 'pending',
+      role: (isMaster || isFirst) ? 'admin' : 'user',
       createdAt: new Date().toISOString()
     };
 
     accounts.push(newAccount);
     this.saveLocalAccounts(accounts);
 
+    if (newAccount.status === 'pending') {
+      throw new Error('⏳ Sua conta foi cadastrada com sucesso! Ela está aguardando a aprovação manual do administrador para ser liberada.');
+    }
+
     this.currentUser = {
       uid: newAccount.uid,
       email: newAccount.email,
       displayName: newAccount.displayName,
+      status: newAccount.status,
+      role: newAccount.role,
       isCloud: false
     };
 
@@ -145,7 +218,7 @@ const AuthManager = {
     return this.currentUser;
   },
 
-  // LOGIN
+  // LOGIN COM VERIFICAÇÃO DE APROVAÇÃO
   async login(email, password) {
     const cleanEmail = String(email || '').trim().toLowerCase();
     const cleanPass = String(password || '').trim();
@@ -154,15 +227,38 @@ const AuthManager = {
       throw new Error('Informe o e-mail e a senha.');
     }
 
+    const isMaster = this.isMasterEmail(cleanEmail);
+
     // Se Firebase estiver configurado
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       try {
         const cred = await firebase.auth().signInWithEmailAndPassword(cleanEmail, cleanPass);
         if (cred.user) {
+          let status = 'approved';
+          let role = isMaster ? 'admin' : 'user';
+
+          if (!isMaster) {
+            // Verificar status no Firestore
+            const accountDoc = await this.getCloudAccountDoc(cred.user.uid);
+            status = accountDoc ? accountDoc.status : 'pending';
+            role = accountDoc ? accountDoc.role : 'user';
+
+            if (status === 'pending') {
+              await firebase.auth().signOut();
+              throw new Error('⏳ Sua conta ainda aguarda aprovação manual do administrador para ser liberada.');
+            }
+            if (status === 'blocked') {
+              await firebase.auth().signOut();
+              throw new Error('🚫 Sua conta foi desativada pelo administrador.');
+            }
+          }
+
           this.currentUser = {
             uid: cred.user.uid,
             email: cred.user.email,
             displayName: cred.user.displayName || cred.user.email.split('@')[0],
+            status: status,
+            role: role,
             isCloud: true
           };
           localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
@@ -174,7 +270,7 @@ const AuthManager = {
       }
     }
 
-    // MODO LOCAL MULTI-CONTAS
+    // MODO LOCAL
     const accounts = this.getLocalAccounts();
     const account = accounts.find(a => a.email === cleanEmail);
 
@@ -186,10 +282,21 @@ const AuthManager = {
       throw new Error('Senha incorreta. Tente novamente.');
     }
 
+    if (!isMaster) {
+      if (account.status === 'pending') {
+        throw new Error('⏳ Sua conta ainda aguarda aprovação manual do administrador para ser liberada.');
+      }
+      if (account.status === 'blocked') {
+        throw new Error('🚫 Sua conta foi desativada pelo administrador.');
+      }
+    }
+
     this.currentUser = {
       uid: account.uid,
       email: account.email,
       displayName: account.displayName,
+      status: 'approved',
+      role: isMaster ? 'admin' : (account.role || 'user'),
       isCloud: false
     };
 
@@ -198,7 +305,32 @@ const AuthManager = {
     return this.currentUser;
   },
 
-  // LOGOUT (Sair da conta)
+  // RECUPERAÇÃO DE SENHA (Esqueci minha senha)
+  async sendPasswordReset(email) {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    if (!cleanEmail) {
+      throw new Error('Por favor, informe seu e-mail de cadastro.');
+    }
+
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      try {
+        await firebase.auth().sendPasswordResetEmail(cleanEmail);
+        return true;
+      } catch (fbErr) {
+        throw new Error(this.translateFirebaseError(fbErr));
+      }
+    }
+
+    // Modo local: simulação de recuperação
+    const accounts = this.getLocalAccounts();
+    const acc = accounts.find(a => a.email === cleanEmail);
+    if (!acc) {
+      throw new Error('Nenhuma conta encontrada com este e-mail.');
+    }
+    return true;
+  },
+
+  // LOGOUT
   async logout() {
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       try {
@@ -214,7 +346,69 @@ const AuthManager = {
     return true;
   },
 
-  // Gerenciamento de contas locais seguras
+  // LISTAR CONTAS PARA O ADMINISTRADOR APROVAR
+  async getAccountsList() {
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      try {
+        const snap = await firebase.firestore().collection('system_accounts').get();
+        const list = [];
+        snap.forEach(doc => list.push(doc.data()));
+        if (list.length > 0) return list;
+      } catch (e) {
+        console.warn('Erro ao listar system_accounts no Firestore:', e);
+      }
+    }
+    return this.getLocalAccounts();
+  },
+
+  // APROVAR OU BLOQUEAR CONTA
+  async updateAccountStatus(uid, newStatus) {
+    if (!uid || !newStatus) return false;
+
+    // Atualizar no Firestore se disponível
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      try {
+        await firebase.firestore().collection('system_accounts').doc(uid).update({ status: newStatus });
+      } catch (e) {
+        console.warn('Erro ao atualizar status no Firestore:', e);
+      }
+    }
+
+    // Atualizar localmente
+    const accounts = this.getLocalAccounts();
+    const idx = accounts.findIndex(a => a.uid === uid);
+    if (idx !== -1) {
+      accounts[idx].status = newStatus;
+      this.saveLocalAccounts(accounts);
+    }
+    return true;
+  },
+
+  // EXCLUIR CONTA
+  async deleteAccount(uid) {
+    if (!uid) return false;
+
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      try {
+        await firebase.firestore().collection('system_accounts').doc(uid).delete();
+      } catch (e) {}
+    }
+
+    const accounts = this.getLocalAccounts();
+    const filtered = accounts.filter(a => a.uid !== uid);
+    this.saveLocalAccounts(filtered);
+    return true;
+  },
+
+  async getCloudAccountDoc(uid) {
+    try {
+      const doc = await firebase.firestore().collection('system_accounts').doc(uid).get();
+      return doc.exists ? doc.data() : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
   getLocalAccounts() {
     try {
       const data = localStorage.getItem(this.LOCAL_USERS_KEY);
@@ -232,7 +426,6 @@ const AuthManager = {
     }
   },
 
-  // Hash simples para senhas locais
   simpleHash(str) {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -243,7 +436,6 @@ const AuthManager = {
     return 'h_' + Math.abs(hash).toString(36);
   },
 
-  // Tradução amigável de erros do Firebase
   translateFirebaseError(error) {
     const code = error.code || '';
     switch (code) {

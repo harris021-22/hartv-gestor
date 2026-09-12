@@ -57,6 +57,12 @@
         </button>
       </div>
 
+      <!-- Botão Gerenciar Contas / Aprovações (Admin) -->
+      <button id="btnManageAccounts" class="icon-btn" title="Aprovações e Contas" style="display: none;">
+        <span>👥</span>
+        <span id="pendingBadge" class="badge-dot" style="display: none; background: #f59e0b; box-shadow: 0 0 8px #f59e0b;"></span>
+      </button>
+
       <!-- Botão Notificações -->
       <button id="btnNotifications" class="icon-btn" title="Notificações e Alertas">
         <span>🔔</span>
@@ -493,6 +499,9 @@
         <div class="form-group">
           <label class="form-label" for="loginPassword">Senha</label>
           <input type="password" id="loginPassword" class="form-input" placeholder="Sua senha secreta" required autocomplete="current-password">
+          <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+            <button type="button" id="btnOpenForgotPass" class="text-link-btn">Esqueceu a senha?</button>
+          </div>
         </div>
         <button type="submit" id="btnLoginSubmit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
           <span>🚀 Entrar no Painel</span>
@@ -514,12 +523,60 @@
           <input type="password" id="regPassword" class="form-input" placeholder="Mínimo 6 caracteres" minlength="6" required autocomplete="new-password">
         </div>
         <button type="submit" id="btnRegisterSubmit" class="btn btn-success" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
-          <span>✨ Criar Conta Privada</span>
+          <span>✨ Solicitar Cadastro</span>
         </button>
       </form>
 
       <div class="auth-security-badge">
-        🔒 Cada conta acessa apenas os seus próprios clientes com segurança total.
+        🔒 Novos cadastros passam por aprovação manual do administrador.
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Esqueci Minha Senha -->
+  <div id="forgotPasswordModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-header">
+        <h2 class="modal-title">🔑 Redefinir Senha</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="forgotPasswordForm">
+        <div class="modal-body">
+          <p style="font-size: 0.85rem; color: var(--text-muted);">
+            Informe o e-mail cadastrado. Enviaremos um link oficial e seguro para você redefinir a sua senha.
+          </p>
+          <div class="form-group">
+            <label class="form-label" for="forgotEmail">Seu E-mail Cadastrado</label>
+            <input type="email" id="forgotEmail" class="form-input" placeholder="seuemail@exemplo.com" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary modal-cancel">Cancelar</button>
+          <button type="submit" id="btnForgotSubmit" class="btn btn-primary">
+            <span>✉️ Enviar Link</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Gerenciar Contas / Aprovações (Admin Master) -->
+  <div id="manageAccountsModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2 class="modal-title">👥 Contas &amp; Aprovações</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 8px;">
+          Aqui você aprova ou bloqueia o acesso de outros usuários ao sistema:
+        </p>
+        <div id="accountsListContainer" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Renderizado via app.js -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-cancel">Fechar</button>
       </div>
     </div>
   </div>

@@ -278,6 +278,51 @@ const App = {
     if (btnLogout) {
       btnLogout.addEventListener('click', () => this.handleLogout());
     }
+
+    // Esqueci Minha Senha
+    const btnOpenForgotPass = document.getElementById('btnOpenForgotPass');
+    if (btnOpenForgotPass) {
+      btnOpenForgotPass.addEventListener('click', () => {
+        const modal = document.getElementById('forgotPasswordModal');
+        const loginEmail = document.getElementById('loginEmail').value.trim();
+        if (loginEmail) {
+          document.getElementById('forgotEmail').value = loginEmail;
+        }
+        if (modal) modal.classList.add('open');
+      });
+    }
+
+    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+    if (forgotPasswordForm) {
+      forgotPasswordForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('forgotEmail').value.trim();
+        const submitBtn = document.getElementById('btnForgotSubmit');
+        try {
+          if (submitBtn) submitBtn.disabled = true;
+          await AuthManager.sendPasswordReset(email);
+          this.closeAllModals();
+          this.showToast(`Link de recuperação enviado para ${email}! Verifique seu e-mail.`, 'success');
+          forgotPasswordForm.reset();
+        } catch (err) {
+          alert(err.message || 'Erro ao enviar link de recuperação.');
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+        }
+      });
+    }
+
+    // Botão de Gestão de Contas (Admin Master)
+    const btnManageAccounts = document.getElementById('btnManageAccounts');
+    if (btnManageAccounts) {
+      btnManageAccounts.addEventListener('click', () => {
+        const modal = document.getElementById('manageAccountsModal');
+        if (modal) {
+          modal.classList.add('open');
+          this.renderAccountsList();
+        }
+      });
+    }
   },
 
   // Gerenciamento do estado da autenticação (UI)
@@ -286,11 +331,13 @@ const App = {
     const userChip = document.getElementById('userProfileChip');
     const userAvatarText = document.getElementById('userAvatarText');
     const userNameText = document.getElementById('userNameText');
+    const btnManageAccounts = document.getElementById('btnManageAccounts');
 
     if (!user) {
       // Usuário deslogado: exibir tela de login
       if (authScreen) authScreen.style.display = 'flex';
       if (userChip) userChip.style.display = 'none';
+      if (btnManageAccounts) btnManageAccounts.style.display = 'none';
       this.clients = [];
       this.render();
     } else {
@@ -303,8 +350,115 @@ const App = {
         if (userNameText) userNameText.textContent = name;
       }
 
+      // Exibir botão de aprovações se for administrador
+      if (btnManageAccounts) {
+        btnManageAccounts.style.display = AuthManager.isAdmin() ? 'flex' : 'none';
+        if (AuthManager.isAdmin()) {
+          this.checkPendingAccounts();
+        }
+      }
+
       // Carregar os clientes específicos desta conta
       this.loadClients();
+    }
+  },
+
+  // Checar quantas contas estão pendentes de aprovação
+  async checkPendingAccounts() {
+    try {
+      const accounts = await AuthManager.getAccountsList();
+      const pendingCount = accounts.filter(a => a.status === 'pending').length;
+      const pendingBadge = document.getElementById('pendingBadge');
+      if (pendingBadge) {
+        pendingBadge.style.display = pendingCount > 0 ? 'block' : 'none';
+      }
+    } catch (e) {}
+  },
+
+  // Renderizar Lista de Contas para Aprovação
+  async renderAccountsList() {
+    const container = document.getElementById('accountsListContainer');
+    if (!container) return;
+
+    container.innerHTML = '<div style="text-align: center; color: var(--text-dim); padding: 20px;">Carregando contas...</div>';
+
+    try {
+      const accounts = await AuthManager.getAccountsList();
+      const currentUser = AuthManager.getUser();
+
+      if (accounts.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-dim); padding: 20px;">Nenhuma conta encontrada.</div>';
+        return;
+      }
+
+      container.innerHTML = accounts.map(acc => {
+        const isCurrent = currentUser && currentUser.uid === acc.uid;
+        const status = acc.status || 'pending';
+        let statusBadge = '<span class="status-pill pending">⏳ Pendente</span>';
+        if (status === 'approved') statusBadge = '<span class="status-pill approved">🟢 Aprovado</span>';
+        if (status === 'blocked') statusBadge = '<span class="status-pill blocked">🔴 Bloqueado</span>';
+
+        return `
+          <div class="account-item-card">
+            <div class="account-info">
+              <div class="account-name-row">
+                <span class="account-name">${this.escapeHtml(acc.displayName || 'Sem nome')}</span>
+                ${acc.role === 'admin' ? '<span style="font-size: 0.65rem; background: rgba(139, 92, 246, 0.2); color: #c084fc; padding: 2px 6px; border-radius: 4px; font-weight: 700;">ADMIN MASTER</span>' : ''}
+                ${isCurrent ? '<span style="font-size: 0.65rem; color: #38bdf8;">(Você)</span>' : ''}
+              </div>
+              <span class="account-email">${this.escapeHtml(acc.email)}</span>
+              <div style="margin-top: 4px;">${statusBadge}</div>
+            </div>
+
+            <div class="account-actions-group">
+              ${status !== 'approved' ? `
+                <button class="btn-acc-action btn-acc-approve" onclick="App.handleApproveAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}')">
+                  <span>✅ Aprovar</span>
+                </button>
+              ` : ''}
+
+              ${status === 'approved' && !isCurrent ? `
+                <button class="btn-acc-action btn-acc-block" onclick="App.handleBlockAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}')">
+                  <span>🚫 Bloquear</span>
+                </button>
+              ` : ''}
+
+              ${!isCurrent ? `
+                <button class="btn-acc-action btn-acc-delete" onclick="App.handleDeleteAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}')">
+                  <span>🗑️</span>
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      this.checkPendingAccounts();
+    } catch (e) {
+      container.innerHTML = `<div style="color: var(--danger); padding: 10px;">Erro ao carregar contas: ${e.message}</div>`;
+    }
+  },
+
+  // Ações de Aprovação / Bloqueio pelo Admin
+  async handleApproveAccount(uid, name) {
+    await AuthManager.updateAccountStatus(uid, 'approved');
+    this.showToast(`Conta de "${name}" aprovada com sucesso!`, 'success');
+    this.renderAccountsList();
+  },
+
+  async handleBlockAccount(uid, name) {
+    if (confirm(`Deseja realmente bloquear o acesso de "${name}"?`)) {
+      await AuthManager.updateAccountStatus(uid, 'blocked');
+      this.showToast(`Conta de "${name}" foi bloqueada.`, 'info');
+      this.renderAccountsList();
+    }
+  },
+
+  async handleDeleteAccount(uid, name) {
+    if (confirm(`Tem certeza que deseja excluir a conta de "${name}"?`)) {
+      await AuthManager.deleteAccount(uid);
+      this.showToast(`Conta de "${name}" excluída.`, 'info');
+      this.renderAccountsList();
     }
   },
 

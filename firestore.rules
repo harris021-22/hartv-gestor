@@ -2,6 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Contas do sistema para controle de aprovação manual
+    match /system_accounts/{userId} {
+      allow read, write: if request.auth != null;
+    }
+
     // Regra de Isolamento e Segurança Total:
     // Cada usuário só pode ler e escrever nos seus próprios dados e clientes.
     // Nenhuma conta consegue acessar, ler ou alterar dados de outra conta.
