@@ -405,7 +405,11 @@ const App = {
   // Abrir Menu Lateral Drawer
   openDrawer() {
     const drawer = document.getElementById('drawerOverlay');
-    if (drawer) drawer.classList.add('open');
+    if (drawer) {
+      drawer.style.display = 'block';
+      void drawer.offsetWidth; // Forçar cálculo de layout para a transição suave
+      drawer.classList.add('open');
+    }
     if (typeof AuthManager !== 'undefined' && AuthManager.isAdmin()) {
       this.checkPendingAccounts();
     }
@@ -414,7 +418,14 @@ const App = {
   // Fechar Menu Lateral Drawer
   closeDrawer() {
     const drawer = document.getElementById('drawerOverlay');
-    if (drawer) drawer.classList.remove('open');
+    if (drawer) {
+      drawer.classList.remove('open');
+      setTimeout(() => {
+        if (drawer && !drawer.classList.contains('open')) {
+          drawer.style.display = 'none';
+        }
+      }, 300);
+    }
   },
 
   // Gerenciamento do estado da autenticação (UI)
