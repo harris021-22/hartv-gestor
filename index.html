@@ -2,145 +2,462 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Teste Científico de Alta Precisão: Tu é gay? 😂🏳️‍🌈</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>HarTv Gestor - Gerenciador de Clientes</title>
   
-  <!-- Fontes do Google: Outfit e Playfair Display -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
-  
-  <!-- Estilos principais -->
-  <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%200%20100%20100%22><text y=%22.9em%22 font-size=%2290%22>🏳️‍🌈</text></svg>">
+  <!-- PWA & Mobile Meta Tags -->
+  <meta name="theme-color" content="#06b6d4">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="HarTv Gestor">
+  <meta name="description" content="Aplicativo para gerenciar clientes, assinaturas e vencimentos de IPTV no Android sem banco de dados.">
+
+  <!-- Manifest e Ícones -->
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <!-- Canvas de partículas de fundo -->
-  <canvas id="bg-canvas"></canvas>
 
-  <!-- Brilhos de ambientação (Luzes bokeh) -->
-  <div class="ambient-glow glow-1"></div>
-  <div class="ambient-glow glow-2"></div>
-  <div class="ambient-glow glow-3"></div>
+  <!-- Banner de Instalação PWA no Android (aparece automaticamente se suportado) -->
+  <div id="installBanner" class="install-banner" style="display: none;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span>📱</span>
+      <span>Instale o app na sua tela inicial!</span>
+    </div>
+    <button id="installBtn" class="install-btn">Instalar</button>
+  </div>
 
-  <!-- Botão de controle de som suave -->
-  <button id="sound-toggle" class="sound-btn" aria-label="Ativar ou desativar efeitos sonoros" title="Ativar/Desativar Som">
-    <span id="sound-icon">🔊</span>
-    <span class="sound-tooltip">Som ativado</span>
-  </button>
+  <!-- Header Superior -->
+  <header class="app-header">
+    <div class="brand-container">
+      <div class="brand-logo">
+        <svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="512" height="512" rx="100" fill="#0f172a" stroke="#06b6d4" stroke-width="12" />
+          <polygon points="200,160 200,352 352,256" fill="#06b6d4" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="brand-title">HarTv Gestor</h1>
+        <div class="brand-subtitle">Gestão 100% Offline &amp; Segura</div>
+      </div>
+    </div>
 
-  <main class="page-container">
-    <!-- Card Principal: A Pergunta -->
-    <div class="card proposal-card" id="proposal-card">
-      
-      <!-- Tag / Badge de Humor -->
-      <div class="love-badge">
-        <span class="pulse-dot"></span>
-        <span>Detector da Verdade: Seja sincero(a)</span>
-        <span class="heart-icon">🧐</span>
+    <div class="header-actions">
+      <!-- Botão Notificações -->
+      <button id="btnNotifications" class="icon-btn" title="Notificações e Alertas">
+        <span>🔔</span>
+        <span id="notifBadge" class="badge-dot" style="display: none;"></span>
+      </button>
+
+      <!-- Botão Backup (Exportar / Importar) -->
+      <button id="btnBackup" class="icon-btn" title="Backup (Exportar / Importar)">
+        <span>💾</span>
+      </button>
+
+      <!-- Botão Configurações -->
+      <button id="btnSettings" class="icon-btn" title="Configurações e Chave Pix">
+        <span>⚙️</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Conteúdo Principal -->
+  <main class="main-container">
+
+    <!-- Dashboard Financeiro & Resumo -->
+    <section class="dashboard-grid">
+      <div class="stat-card active-card">
+        <span class="stat-label">Ativos 🟢</span>
+        <span id="statActive" class="stat-value success">0</span>
+      </div>
+      <div class="stat-card warning-card">
+        <span class="stat-label">Vencendo 🟡</span>
+        <span id="statWarning" class="stat-value warning">0</span>
+      </div>
+      <div class="stat-card danger-card">
+        <span class="stat-label">Vencidos 🔴</span>
+        <span id="statExpired" class="stat-value danger">0</span>
+      </div>
+      <div class="stat-card revenue-card">
+        <span class="stat-label">Mensal Previsto</span>
+        <span id="statRevenue" class="stat-value primary">R$ 0,00</span>
+      </div>
+    </section>
+
+    <!-- Barra de Busca e Filtros -->
+    <section class="search-filter-box">
+      <div class="search-input-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Buscar cliente, usuário, servidor, app...">
+        <button id="searchClear" class="search-clear">✖</button>
       </div>
 
-      <!-- Ilustração / Avatar Meme com Halo -->
-      <div class="ring-illustration" aria-hidden="true">
-        <div class="ring-halo"></div>
-        <div class="ring-wrapper">
-          <div class="meme-avatar">
-            <span class="avatar-emoji">🤨</span>
-            <span class="avatar-badge">🏳️‍🌈</span>
+      <!-- Filtro Chips -->
+      <div class="filter-chips">
+        <button class="chip active" data-filter="all">
+          Todos <span id="countAll" class="chip-count">0</span>
+        </button>
+        <button class="chip" data-filter="today">
+          ⚠️ Vence Hoje <span id="countToday" class="chip-count">0</span>
+        </button>
+        <button class="chip" data-filter="soon">
+          📅 Próximos 3 dias <span id="countSoon" class="chip-count">0</span>
+        </button>
+        <button class="chip" data-filter="active">
+          🟢 Ativos <span id="countActive" class="chip-count">0</span>
+        </button>
+        <button class="chip" data-filter="expired">
+          🔴 Vencidos <span id="countExpired" class="chip-count">0</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Lista de Clientes -->
+    <section id="clientList" class="client-list">
+      <!-- Inserido dinamicamente via app.js -->
+    </section>
+
+  </main>
+
+  <!-- Botão Flutuante Novo Cliente (FAB) -->
+  <button id="btnAddClient" class="fab-add" title="Cadastrar Novo Cliente">
+    <span style="font-size: 1.3rem; line-height: 1;">+</span>
+    <span>Novo Cliente</span>
+  </button>
+
+  <!-- MODAL: Cadastrar / Editar Cliente -->
+  <div id="clientModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalClientTitle" class="modal-title">Novo Cliente IPTV</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+
+      <form id="clientForm">
+        <div class="modal-body">
+          <input type="hidden" id="clientId">
+
+          <!-- Nome do Cliente -->
+          <div class="form-group">
+            <label class="form-label" for="clientName">Nome do Cliente *</label>
+            <input type="text" id="clientName" class="form-input" placeholder="Ex: João da Silva" required>
+          </div>
+
+          <!-- WhatsApp / Telefone -->
+          <div class="form-group">
+            <label class="form-label" for="clientWhatsapp">WhatsApp / Telefone (com DDD)</label>
+            <input type="tel" id="clientWhatsapp" class="form-input" placeholder="Ex: 11999998888">
+          </div>
+
+          <!-- Vencimento com atalhos rápidos -->
+          <div class="form-group">
+            <label class="form-label" for="clientExpiration">Data de Vencimento *</label>
+            <input type="date" id="clientExpiration" class="form-input" required>
+            <div class="quick-date-btns">
+              <button type="button" class="quick-date-btn" data-days="30">+1 Mês</button>
+              <button type="button" class="quick-date-btn" data-days="90">+3 Meses</button>
+              <button type="button" class="quick-date-btn" data-days="180">+6 Meses</button>
+              <button type="button" class="quick-date-btn" data-days="365">+1 Ano</button>
+            </div>
+          </div>
+
+          <!-- Servidor e Aplicativo (Grid de 2 colunas) -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="clientServer">Servidor / Painel</label>
+              <input type="text" id="clientServer" class="form-input" placeholder="Ex: Servidor Alpha">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="clientApp">Aplicativo (App)</label>
+              <input type="text" id="clientApp" class="form-input" placeholder="Ex: Smarters, XCIPTV" list="commonApps">
+              <datalist id="commonApps">
+                <option value="IPTV Smarters Pro">
+                <option value="XCIPTV Player">
+                <option value="IBO Player">
+                <option value="TiviMate">
+                <option value="SS IPTV">
+                <option value="Smart STB">
+                <option value="DuplexPlay">
+                <option value="Web Player">
+              </datalist>
+            </div>
+          </div>
+
+          <!-- URL / DNS -->
+          <div class="form-group">
+            <label class="form-label" for="clientUrl">URL / DNS do Servidor</label>
+            <input type="text" id="clientUrl" class="form-input" placeholder="Ex: http://dns.servidor.com:8080">
+          </div>
+
+          <!-- Usuário e Senha (Grid de 2 colunas) -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="clientUsername">Usuário (Login)</label>
+              <input type="text" id="clientUsername" class="form-input" placeholder="Ex: user123">
+            </div>
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label class="form-label" for="clientPassword">Senha</label>
+                <button type="button" id="btnGenPassword" style="background: none; border: none; color: var(--primary); font-size: 0.72rem; cursor: pointer;">⚡ Gerar</button>
+              </div>
+              <input type="text" id="clientPassword" class="form-input" placeholder="Ex: pass456">
+            </div>
+          </div>
+
+          <!-- Valor da Mensalidade -->
+          <div class="form-group">
+            <label class="form-label" for="clientPrice">Valor da Mensalidade (R$)</label>
+            <input type="number" id="clientPrice" class="form-input" step="0.50" min="0" placeholder="Ex: 35.00">
+          </div>
+
+          <!-- Observações -->
+          <div class="form-group">
+            <label class="form-label" for="clientNotes">Observações (Opcional)</label>
+            <textarea id="clientNotes" class="form-textarea" rows="2" placeholder="Ex: 2 telas liberadas, TV Samsung da sala"></textarea>
+          </div>
+
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary modal-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Cliente</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Exportar / Importar (Backup Seguro Sem Banco de Dados) -->
+  <div id="backupModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">💾 Backup &amp; Migração</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+
+      <!-- Abas -->
+      <div class="modal-tabs">
+        <button class="modal-tab-btn active" data-tab="export">📤 Exportar Dados</button>
+        <button class="modal-tab-btn" data-tab="import">📥 Importar Dados</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Aba de Exportação -->
+        <div id="tabExport">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+            Exporte todos os seus <strong id="backupTotalCount" style="color: #38bdf8;">0</strong> clientes para um arquivo seguro. Você pode enviar esse arquivo para outro celular (via WhatsApp, Google Drive, Bluetooth ou Telegram) e restaurar tudo lá!
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button id="btnExportJson" class="btn btn-primary" style="justify-content: center; padding: 14px;">
+              <span>💾</span>
+              <span>Baixar Arquivo de Backup (.json)</span>
+            </button>
+
+            <button id="btnShareBackup" class="btn btn-secondary" style="justify-content: center; padding: 12px;">
+              <span>📲</span>
+              <span>Compartilhar (WhatsApp / Drive / Outros)</span>
+            </button>
+          </div>
+
+          <div style="margin-top: 16px; padding: 12px; background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: var(--radius-sm); font-size: 0.78rem; color: #cbd5e1;">
+            💡 <strong>Dica de Uso:</strong> Seus dados nunca vão para servidores de terceiros. Todo o gerenciamento é 100% privado no seu próprio aparelho.
+          </div>
+        </div>
+
+        <!-- Aba de Importação -->
+        <div id="tabImport" style="display: none;">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+            Restaure as informações a partir de um backup exportado em outro celular:
+          </p>
+
+          <!-- Escolha de Modo de Importação -->
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="radio" name="importMode" value="merge" checked>
+              <span><strong>Mesclar:</strong> Adiciona os novos e atualiza existentes (Recomendado)</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="radio" name="importMode" value="replace">
+              <span style="color: #f87171;"><strong>Substituir Tudo:</strong> Apaga a lista atual e deixa apenas a do backup</span>
+            </label>
+          </div>
+
+          <!-- Opção 1: Selecionar Arquivo .json -->
+          <div class="backup-option-card">
+            <span style="font-size: 1.5rem;">📂</span>
+            <div style="font-size: 0.85rem; font-weight: 600;">Opção 1: Carregar Arquivo JSON</div>
+            <label class="btn btn-secondary" style="cursor: pointer;">
+              <span>Selecionar Arquivo</span>
+              <input type="file" id="importFileInput" accept=".json,application/json" style="display: none;">
+            </label>
+          </div>
+
+          <div style="text-align: center; color: var(--text-dim); font-size: 0.78rem; margin: 10px 0;">— OU —</div>
+
+          <!-- Opção 2: Colar Texto do Backup -->
+          <div class="form-group">
+            <label class="form-label" for="importTextarea">Opção 2: Colar Código / Texto do Backup</label>
+            <textarea id="importTextarea" class="form-textarea" rows="4" placeholder="Cole o conteúdo JSON do backup aqui..."></textarea>
+            <button id="btnConfirmTextImport" class="btn btn-primary" style="margin-top: 8px; justify-content: center;">
+              📥 Restaurar a partir do Texto
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- Título de Impacto -->
-      <h1 class="proposal-title">
-        Tu é <span class="highlight-text">gay?</span>
-      </h1>
-
-      <p class="proposal-subtitle">
-        Uma pesquisa científica de alta precisão tecnológica. O detector de mentiras está ligado... responda a verdade absoluta!
-      </p>
-
-      <!-- Feedback dinâmico e engraçado das tentativas do Não -->
-      <div id="escape-counter" class="escape-counter" aria-live="polite"></div>
-
-      <!-- Área de Interação dos Botões -->
-      <div class="actions-container" id="actions-box">
-        <!-- Botão SIM -->
-        <button id="btn-sim" class="btn btn-primary" type="button">
-          <span class="btn-sparkle">✨</span>
-          <span class="btn-text">SIM! 🏳️‍🌈</span>
-          <span class="btn-heart">💅</span>
-        </button>
-
-        <!-- Botão NÃO (O fujão) -->
-        <button id="btn-nao" class="btn btn-secondary" type="button">
-          <span class="btn-text" id="nao-text">Não</span>
-        </button>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-cancel">Fechar</button>
       </div>
-
-      <!-- Dica humorística -->
-      <p class="tender-note">
-        💡 <em>Dica: Tentar clicar no 'Não' costuma ser uma missão fisicamente impossível...</em>
-      </p>
     </div>
+  </div>
 
-    <!-- Card de Celebração (Aparece ao clicar em SIM) -->
-    <div class="card celebration-card hidden" id="celebration-card" aria-hidden="true">
-      <div class="celebration-icon-box">
-        <span class="heart-burst">🏳️‍🌈</span>
-        <span class="celebration-ring">💅</span>
-        <span class="heart-burst">✨</span>
+  <!-- MODAL: Enviar WhatsApp (Acesso ou Cobrança) -->
+  <div id="whatsappModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="whatsappModalTitle" class="modal-title">Mensagem WhatsApp</h2>
+        <button class="modal-close">&times;</button>
       </div>
 
-      <span class="success-pill">Confirmação Oficial Registrada! 🏆</span>
-
-      <h2 class="celebration-title">
-        EU JÁ <span class="gradient-gold">SABIA!</span> 😂
-      </h2>
-
-      <p class="celebration-romantic-quote">
-        "Com muito orgulho, glamour, purpurina e atitude!"
-      </p>
-
-      <!-- Caixa de Informações -->
-      <div class="love-details-box">
-        <div class="detail-item">
-          <span class="detail-label">Status do Teste</span>
-          <span class="detail-value">100% Confirmado 🏳️‍🌈</span>
+      <div class="modal-body" style="gap: 16px;">
+        <!-- Opção 1: Enviar Dados de Acesso -->
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <strong style="font-size: 0.95rem; color: #ffffff;">🚀 Dados de Acesso IPTV</strong>
+            <span style="font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 6px;">Boas-Vindas</span>
+          </div>
+          <p style="font-size: 0.78rem; color: var(--text-muted);">
+            Envia o aplicativo, URL/DNS, usuário, senha e vencimento para o cliente.
+          </p>
+          <div style="display: flex; gap: 8px; margin-top: 4px;">
+            <button id="btnSendAccess" class="btn btn-success" style="flex: 1; justify-content: center;">
+              <span>💬</span> <span>Abrir WhatsApp</span>
+            </button>
+            <button id="btnCopyAccess" class="btn btn-secondary" title="Copiar Texto">
+              <span>📋</span>
+            </button>
+          </div>
         </div>
-        <div class="detail-divider"></div>
-        <div class="detail-item">
-          <span class="detail-label">Momento da Confissão</span>
-          <span class="detail-value" id="current-timestamp">Carregando momento...</span>
+
+        <!-- Opção 2: Enviar Cobrança / Renovação Pix -->
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <strong style="font-size: 0.95rem; color: #ffffff;">💰 Lembrete de Cobrança (Pix)</strong>
+            <span style="font-size: 0.72rem; background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 6px;">Renovação</span>
+          </div>
+          <p style="font-size: 0.78rem; color: var(--text-muted);">
+            Envia lembrete de vencimento, valor da mensalidade e sua chave Pix configurada.
+          </p>
+          <div style="display: flex; gap: 8px; margin-top: 4px;">
+            <button id="btnSendBilling" class="btn btn-success" style="flex: 1; justify-content: center;">
+              <span>💬</span> <span>Abrir WhatsApp</span>
+            </button>
+            <button id="btnCopyBilling" class="btn btn-secondary" title="Copiar Texto">
+              <span>📋</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Mensagem Revelada -->
-      <div class="love-letter">
-        <div class="letter-stamp">💌</div>
-        <p class="letter-text">
-          Parabéns pela coragem e sinceridade! Não adiantava nada tentar clicar no 'Não', porque o destino já estava traçado. Agora manda esse teste pros seus amigos pra ver quem mais vai tentar fugir da verdade! 😂✨
-        </p>
-        <span class="letter-sign">Divou com sucesso! 💅✨</span>
-      </div>
-
-      <!-- Botões de Ação na Celebração -->
-      <div class="celebration-actions">
-        <button id="btn-confetti-more" class="btn btn-celebrate" type="button">
-          🎉 Mais Purpurina & Confetes!
-        </button>
-        <button id="btn-restart" class="btn btn-link" type="button">
-          ↺ Testar outro amigo
-        </button>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-cancel">Fechar</button>
       </div>
     </div>
-  </main>
+  </div>
 
-  <footer class="page-footer">
-    <p>Feito com bom humor, purpurina e muita alegria 🌈✨</p>
-  </footer>
+  <!-- MODAL: Configurações & Notificações -->
+  <div id="settingsModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">⚙️ Configurações do App</h2>
+        <button class="modal-close">&times;</button>
+      </div>
 
-  <!-- Script da Landing Page -->
-  <script src="script.js"></script>
+      <form id="settingsForm">
+        <div class="modal-body">
+          <!-- Status das Notificações -->
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <strong style="font-size: 0.88rem; color: #ffffff;">🔔 Notificações no Celular</strong>
+              <div id="notifPermissionStatus" style="font-size: 0.75rem;"></div>
+            </div>
+            <p style="font-size: 0.78rem; color: var(--text-muted);">
+              Receba avisos no seu celular quando clientes vencerem hoje ou estiverem prestes a vencer.
+            </p>
+            <button type="button" id="btnTestNotification" class="btn btn-secondary" style="margin-top: 4px; justify-content: center;">
+              <span>🔔</span> <span>Testar Notificação Agora</span>
+            </button>
+          </div>
+
+          <!-- Chave Pix, Titular e Banco -->
+          <div class="form-group">
+            <label class="form-label" for="settingPixKey">Sua Chave Pix para Cobrança</label>
+            <input type="text" id="settingPixKey" class="form-input" placeholder="Ex: (21)964551053">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="settingPixName">Nome do Titular</label>
+              <input type="text" id="settingPixName" class="form-input" placeholder="Ex: Andrew Gibson Harris">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="settingPixBank">Banco</label>
+              <input type="text" id="settingPixBank" class="form-input" placeholder="Ex: Itaú">
+            </div>
+          </div>
+
+          <!-- URL Padrão -->
+          <div class="form-group">
+            <label class="form-label" for="settingDefaultUrl">URL / DNS Padrão do seu Servidor</label>
+            <input type="text" id="settingDefaultUrl" class="form-input" placeholder="Ex: http://meudns.com:8080 (auto-preenche novos clientes)">
+          </div>
+
+          <!-- Dias de Antecedência para Notificação -->
+          <div class="form-group">
+            <label class="form-label" for="settingNotifyDays">Avisar com quantos dias de antecedência?</label>
+            <select id="settingNotifyDays" class="form-select">
+              <option value="1">1 dia antes</option>
+              <option value="2">2 dias antes</option>
+              <option value="3" selected>3 dias antes (Padrão)</option>
+              <option value="5">5 dias antes</option>
+              <option value="7">7 dias antes</option>
+            </select>
+          </div>
+
+          <!-- Modelo de Mensagem de Cobrança -->
+          <div class="form-group">
+            <label class="form-label" for="settingBillingMsg">Modelo de Mensagem de Cobrança</label>
+            <textarea id="settingBillingMsg" class="form-textarea" rows="3"></textarea>
+            <span style="font-size: 0.7rem; color: var(--text-dim);">Variáveis: {NOME}, {VENCIMENTO}, {VALOR}, {PIX}, {TITULAR}, {BANCO}</span>
+          </div>
+
+          <!-- Modelo de Mensagem de Acesso -->
+          <div class="form-group">
+            <label class="form-label" for="settingAccessMsg">Modelo de Dados de Acesso</label>
+            <textarea id="settingAccessMsg" class="form-textarea" rows="4"></textarea>
+            <span style="font-size: 0.7rem; color: var(--text-dim);">Variáveis: {NOME}, {APP}, {URL}, {USUARIO}, {SENHA}, {VENCIMENTO}</span>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary modal-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Configurações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="./storage.js"></script>
+  <script src="./notifications.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
