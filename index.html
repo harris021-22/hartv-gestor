@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
 
   <!-- Estilos -->
-  <link rel="stylesheet" href="./style.css?v=2.5">
+  <link rel="stylesheet" href="./style.css?v=3.0">
   <style>
     /* Estilos Críticos do Menu Lateral Deslizante (Garante visual perfeito mesmo com cache antigo) */
     .drawer-overlay {
@@ -791,8 +791,8 @@
       <!-- Form Cadastro -->
       <form id="formRegister" class="auth-form" style="display: none;">
         <div class="form-group">
-          <label class="form-label" for="regName">Nome da Conta / Administrador</label>
-          <input type="text" id="regName" class="form-input" placeholder="Ex: Admin 1" required autocomplete="name">
+          <label class="form-label" for="regName">Seu Nome Completo</label>
+          <input type="text" id="regName" class="form-input" placeholder="Ex: Carlos Silva" required autocomplete="name">
         </div>
         <div class="form-group">
           <label class="form-label" for="regEmail">E-mail</label>
@@ -803,12 +803,12 @@
           <input type="password" id="regPassword" class="form-input" placeholder="Mínimo 6 caracteres" minlength="6" required autocomplete="new-password">
         </div>
         <button type="submit" id="btnRegisterSubmit" class="btn btn-success" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
-          <span>✨ Solicitar Cadastro</span>
+          <span>✨ Solicitar Acesso</span>
         </button>
       </form>
 
       <div class="auth-security-badge">
-        🔒 Novos cadastros passam por aprovação manual do administrador.
+        🔒 As novas contas solicitadas precisam de aprovação prévia para liberar o acesso.
       </div>
     </div>
   </div>
@@ -867,11 +867,11 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <!-- Scripts da Aplicação -->
-  <script src="./firebase-config.js?v=2.5"></script>
-  <script src="./auth.js?v=2.5"></script>
-  <script src="./database.js?v=2.5"></script>
-  <script src="./storage.js?v=2.5"></script>
-  <script src="./notifications.js?v=2.5"></script>
-  <script src="./app.js?v=2.5"></script>
+  <script src="./firebase-config.js?v=3.0"></script>
+  <script src="./auth.js?v=3.0"></script>
+  <script src="./database.js?v=3.0"></script>
+  <script src="./storage.js?v=3.0"></script>
+  <script src="./notifications.js?v=3.0"></script>
+  <script src="./app.js?v=3.0"></script>
 </body>
 </html>

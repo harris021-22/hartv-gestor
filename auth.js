@@ -1,5 +1,6 @@
 // auth.js - Sistema de Autenticação, Recuperação de Senha e Aprovação Manual de Contas
-// Suporta Firebase Auth e Gerenciador Multi-Contas Blindado
+// Master Admin exclusivo: andrew.g.h.agh@gmail.com
+// Todas as outras contas obrigatoriamente solicitam acesso e necessitam de aprovação prévia.
 
 const AuthManager = {
   CURRENT_USER_KEY: 'hartv_current_user_session',
@@ -7,7 +8,7 @@ const AuthManager = {
   currentUser: null,
   authListeners: [],
 
-  // E-mail do Administrador Master Principal
+  // E-mail do Administrador Master Principal (ÚNICO QUE PODE SER ADMIN)
   MASTER_ADMIN_EMAILS: [
     'andrew.g.h.agh@gmail.com'
   ],
@@ -19,14 +20,30 @@ const AuthManager = {
 
   // Inicialização do Auth
   async init() {
-    // 1. Tentar restaurar sessão salva
+    // 1. Limpeza automática: garantir que apenas andrew.g.h.agh@gmail.com exista
+    this.purgeNonMasterAccounts();
+
+    // 2. Tentar restaurar sessão salva
     try {
       const savedSession = localStorage.getItem(this.CURRENT_USER_KEY);
       if (savedSession) {
-        this.currentUser = JSON.parse(savedSession);
-        if (this.isMasterEmail(this.currentUser.email)) {
-          this.currentUser.role = 'admin';
-          this.currentUser.status = 'approved';
+        const parsed = JSON.parse(savedSession);
+        if (this.isMasterEmail(parsed.email)) {
+          this.currentUser = {
+            ...parsed,
+            role: 'admin',
+            status: 'approved'
+          };
+        } else {
+          // Usuários comuns NUNCA podem ter role admin
+          this.currentUser = {
+            ...parsed,
+            role: 'user'
+          };
+          if (this.currentUser.status !== 'approved') {
+            this.currentUser = null;
+            localStorage.removeItem(this.CURRENT_USER_KEY);
+          }
         }
       }
     } catch (e) {
@@ -34,7 +51,7 @@ const AuthManager = {
       this.currentUser = null;
     }
 
-    // 2. Se Firebase estiver configurado e disponível
+    // 3. Se Firebase estiver configurado e disponível
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       try {
         if (!firebase.apps.length) {
@@ -43,16 +60,17 @@ const AuthManager = {
         firebase.auth().onAuthStateChanged(async (user) => {
           if (user) {
             const isMaster = this.isMasterEmail(user.email);
-            let status = 'approved';
+            let status = isMaster ? 'approved' : 'pending';
             let role = isMaster ? 'admin' : 'user';
 
             if (!isMaster) {
               const accountDoc = await this.getCloudAccountDoc(user.uid);
-              status = accountDoc ? accountDoc.status : 'pending';
-              role = accountDoc ? accountDoc.role : 'user';
+              status = accountDoc && accountDoc.status ? accountDoc.status : 'pending';
+              role = 'user'; // Jamais permitir admin para terceiros
 
-              if (status === 'pending') {
-                await firebase.auth().signOut();
+              // Se não estiver aprovado, desconectar imediatamente!
+              if (status !== 'approved') {
+                await firebase.auth().signOut().catch(() => {});
                 this.currentUser = null;
                 localStorage.removeItem(this.CURRENT_USER_KEY);
                 this.notifyListeners();
@@ -86,6 +104,7 @@ const AuthManager = {
     this.notifyListeners();
   },
 
+  // Retorna os dados do usuário logado
   getUser() {
     return this.currentUser;
   },
@@ -94,9 +113,10 @@ const AuthManager = {
     return this.currentUser !== null;
   },
 
+  // EXCLUSIVAMENTE andrew.g.h.agh@gmail.com pode ser administrador
   isAdmin() {
     if (!this.currentUser) return false;
-    return this.isMasterEmail(this.currentUser.email) || this.currentUser.role === 'admin';
+    return this.isMasterEmail(this.currentUser.email);
   },
 
   onAuthStateChanged(callback) {
@@ -112,7 +132,7 @@ const AuthManager = {
     });
   },
 
-  // CADASTRO COM APROVAÇÃO MANUAL
+  // CADASTRO DE CONTAS (SOLICITAÇÃO DE ACESSO COM APROVAÇÃO MANUAL)
   async register(displayName, email, password) {
     const cleanEmail = String(email || '').trim().toLowerCase();
     const cleanPass = String(password || '').trim();
@@ -125,21 +145,19 @@ const AuthManager = {
       throw new Error('A senha deve conter no mínimo 6 caracteres.');
     }
 
-    // Se Firebase estiver configurado
+    const isMaster = this.isMasterEmail(cleanEmail);
+    // REGRA DE OURO: Somente andrew.g.h.agh@gmail.com nasce como 'approved' e 'admin'.
+    // TODAS as outras contas nascem estritamente como 'pending' e 'user'!
+    const initialStatus = isMaster ? 'approved' : 'pending';
+    const initialRole = isMaster ? 'admin' : 'user';
+
+    // 1. Cadastro via Firebase Auth
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       try {
         const cred = await firebase.auth().createUserWithEmailAndPassword(cleanEmail, cleanPass);
         if (cred.user) {
           await cred.user.updateProfile({ displayName: cleanName });
 
-          // Verificar se é o email do Master Admin ou primeira conta
-          const isMaster = this.isMasterEmail(cleanEmail);
-          const allAccs = await this.getAccountsList();
-          const isFirstAccount = allAccs.length <= 1;
-          const initialStatus = (isMaster || isFirstAccount) ? 'approved' : 'pending';
-          const initialRole = (isMaster || isFirstAccount) ? 'admin' : 'user';
-
-          // Salvar metadados da conta para aprovação
           const accountData = {
             uid: cred.user.uid,
             email: cleanEmail,
@@ -155,9 +173,13 @@ const AuthManager = {
             console.warn('Erro ao salvar em system_accounts:', e);
           }
 
-          if (initialStatus === 'pending') {
-            await firebase.auth().signOut();
-            throw new Error('⏳ Sua conta foi cadastrada com sucesso! Ela está aguardando a aprovação manual do administrador para ser liberada.');
+          // Se for usuário solicitante (não-master), desconectar imediatamente e bloquear entrada
+          if (!isMaster) {
+            await firebase.auth().signOut().catch(() => {});
+            this.currentUser = null;
+            localStorage.removeItem(this.CURRENT_USER_KEY);
+            this.notifyListeners();
+            throw new Error('⏳ Sua solicitação foi enviada com sucesso! O acesso está bloqueado até que o administrador (andrew.g.h.agh@gmail.com) aprove o seu cadastro.');
           }
 
           this.currentUser = {
@@ -177,31 +199,33 @@ const AuthManager = {
       }
     }
 
-    // MODO LOCAL MULTI-CONTAS COM APROVAÇÃO MANUAL
+    // 2. Cadastro via Modo Local Multi-Contas
     const accounts = this.getLocalAccounts();
-    const existing = accounts.find(a => a.email === cleanEmail);
+    const existing = accounts.find(a => a.email && a.email.toLowerCase() === cleanEmail);
     if (existing) {
       throw new Error('Já existe uma conta cadastrada com este e-mail.');
     }
 
-    const isMaster = this.isMasterEmail(cleanEmail);
-    const isFirst = accounts.length === 0;
     const uid = 'usr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
     const newAccount = {
       uid,
       displayName: cleanName,
       email: cleanEmail,
       passwordHash: this.simpleHash(cleanPass),
-      status: (isMaster || isFirst) ? 'approved' : 'pending',
-      role: (isMaster || isFirst) ? 'admin' : 'user',
+      status: initialStatus,
+      role: initialRole,
       createdAt: new Date().toISOString()
     };
 
     accounts.push(newAccount);
     this.saveLocalAccounts(accounts);
 
-    if (newAccount.status === 'pending') {
-      throw new Error('⏳ Sua conta foi cadastrada com sucesso! Ela está aguardando a aprovação manual do administrador para ser liberada.');
+    // Se for usuário solicitante (não-master), bloquear entrada imediatamente
+    if (!isMaster) {
+      this.currentUser = null;
+      localStorage.removeItem(this.CURRENT_USER_KEY);
+      this.notifyListeners();
+      throw new Error('⏳ Sua solicitação foi enviada com sucesso! O acesso está bloqueado até que o administrador (andrew.g.h.agh@gmail.com) aprove o seu cadastro.');
     }
 
     this.currentUser = {
@@ -229,27 +253,28 @@ const AuthManager = {
 
     const isMaster = this.isMasterEmail(cleanEmail);
 
-    // Se Firebase estiver configurado
+    // 1. Login via Firebase Auth
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       try {
         const cred = await firebase.auth().signInWithEmailAndPassword(cleanEmail, cleanPass);
         if (cred.user) {
-          let status = 'approved';
+          let status = isMaster ? 'approved' : 'pending';
           let role = isMaster ? 'admin' : 'user';
 
           if (!isMaster) {
-            // Verificar status no Firestore
+            // Checar documento no Firestore
             const accountDoc = await this.getCloudAccountDoc(cred.user.uid);
-            status = accountDoc ? accountDoc.status : 'pending';
-            role = accountDoc ? accountDoc.role : 'user';
+            status = accountDoc && accountDoc.status ? accountDoc.status : 'pending';
+            role = 'user'; // Jamais admin
 
-            if (status === 'pending') {
-              await firebase.auth().signOut();
-              throw new Error('⏳ Sua conta ainda aguarda aprovação manual do administrador para ser liberada.');
-            }
-            if (status === 'blocked') {
-              await firebase.auth().signOut();
-              throw new Error('🚫 Sua conta foi desativada pelo administrador.');
+            if (status !== 'approved') {
+              await firebase.auth().signOut().catch(() => {});
+              this.currentUser = null;
+              localStorage.removeItem(this.CURRENT_USER_KEY);
+              if (status === 'blocked') {
+                throw new Error('🚫 Sua conta foi desativada pelo administrador.');
+              }
+              throw new Error('⏳ Sua solicitação ainda não foi aprovada pelo administrador (andrew.g.h.agh@gmail.com). Aguarde a liberação.');
             }
           }
 
@@ -257,8 +282,8 @@ const AuthManager = {
             uid: cred.user.uid,
             email: cred.user.email,
             displayName: cred.user.displayName || cred.user.email.split('@')[0],
-            status: status,
-            role: role,
+            status: 'approved',
+            role: isMaster ? 'admin' : 'user',
             isCloud: true
           };
           localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
@@ -270,9 +295,9 @@ const AuthManager = {
       }
     }
 
-    // MODO LOCAL
+    // 2. Login no Modo Local
     const accounts = this.getLocalAccounts();
-    const account = accounts.find(a => a.email === cleanEmail);
+    const account = accounts.find(a => a.email && a.email.toLowerCase() === cleanEmail);
 
     if (!account) {
       throw new Error('Nenhuma conta encontrada com este e-mail.');
@@ -283,11 +308,11 @@ const AuthManager = {
     }
 
     if (!isMaster) {
-      if (account.status === 'pending') {
-        throw new Error('⏳ Sua conta ainda aguarda aprovação manual do administrador para ser liberada.');
-      }
-      if (account.status === 'blocked') {
-        throw new Error('🚫 Sua conta foi desativada pelo administrador.');
+      if (account.status !== 'approved') {
+        if (account.status === 'blocked') {
+          throw new Error('🚫 Sua conta foi desativada pelo administrador.');
+        }
+        throw new Error('⏳ Sua solicitação ainda não foi aprovada pelo administrador (andrew.g.h.agh@gmail.com). Aguarde a liberação.');
       }
     }
 
@@ -296,7 +321,7 @@ const AuthManager = {
       email: account.email,
       displayName: account.displayName,
       status: 'approved',
-      role: isMaster ? 'admin' : (account.role || 'user'),
+      role: isMaster ? 'admin' : 'user',
       isCloud: false
     };
 
@@ -305,7 +330,7 @@ const AuthManager = {
     return this.currentUser;
   },
 
-  // RECUPERAÇÃO DE SENHA (Esqueci minha senha)
+  // RECUPERAÇÃO DE SENHA
   async sendPasswordReset(email) {
     const cleanEmail = String(email || '').trim().toLowerCase();
     if (!cleanEmail) {
@@ -321,9 +346,8 @@ const AuthManager = {
       }
     }
 
-    // Modo local: simulação de recuperação
     const accounts = this.getLocalAccounts();
-    const acc = accounts.find(a => a.email === cleanEmail);
+    const acc = accounts.find(a => a.email && a.email.toLowerCase() === cleanEmail);
     if (!acc) {
       throw new Error('Nenhuma conta encontrada com este e-mail.');
     }
@@ -346,26 +370,55 @@ const AuthManager = {
     return true;
   },
 
-  // LISTAR CONTAS PARA O ADMINISTRADOR APROVAR
+  // LISTAR CONTAS PARA O ADMINISTRADOR MASTER APROVAR
   async getAccountsList() {
+    const masterEmail = 'andrew.g.h.agh@gmail.com';
+    let list = [];
+
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       try {
         const snap = await firebase.firestore().collection('system_accounts').get();
-        const list = [];
         snap.forEach(doc => list.push(doc.data()));
-        if (list.length > 0) return list;
       } catch (e) {
         console.warn('Erro ao listar system_accounts no Firestore:', e);
       }
     }
-    return this.getLocalAccounts();
+
+    if (list.length === 0) {
+      list = this.getLocalAccounts();
+    }
+
+    // Garantir que Andrew Harris esteja sempre presente na lista como ADMIN MASTER
+    const hasMaster = list.some(a => a.email && a.email.toLowerCase() === masterEmail);
+    if (!hasMaster) {
+      list.unshift({
+        uid: 'usr_master_agh',
+        displayName: 'Andrew Harris',
+        email: masterEmail,
+        status: 'approved',
+        role: 'admin',
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    // Blindagem: APENAS Andrew Harris pode ter role: admin
+    list.forEach(a => {
+      if (a.email && a.email.toLowerCase() === masterEmail) {
+        a.role = 'admin';
+        a.status = 'approved';
+      } else {
+        a.role = 'user';
+      }
+    });
+
+    return list;
   },
 
   // APROVAR OU BLOQUEAR CONTA
   async updateAccountStatus(uid, newStatus) {
     if (!uid || !newStatus) return false;
 
-    // Atualizar no Firestore se disponível
+    // Atualizar no Firestore
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       try {
         await firebase.firestore().collection('system_accounts').doc(uid).update({ status: newStatus });
@@ -384,7 +437,7 @@ const AuthManager = {
     return true;
   },
 
-  // EXCLUIR CONTA
+  // EXCLUIR UMA CONTA ESPECÍFICA
   async deleteAccount(uid) {
     if (!uid) return false;
 
@@ -397,6 +450,60 @@ const AuthManager = {
     const accounts = this.getLocalAccounts();
     const filtered = accounts.filter(a => a.uid !== uid);
     this.saveLocalAccounts(filtered);
+    return true;
+  },
+
+  // EXCLUIR TODAS AS OUTRAS CONTAS, DEIXANDO APENAS andrew.g.h.agh@gmail.com
+  async purgeNonMasterAccounts() {
+    const masterEmail = 'andrew.g.h.agh@gmail.com';
+
+    // 1. Limpeza local
+    const local = this.getLocalAccounts();
+    const filtered = local.filter(a => a.email && a.email.toLowerCase() === masterEmail);
+    if (filtered.length === 0) {
+      filtered.push({
+        uid: 'usr_master_agh',
+        displayName: 'Andrew Harris',
+        email: masterEmail,
+        status: 'approved',
+        role: 'admin',
+        createdAt: new Date().toISOString()
+      });
+    } else {
+      filtered[0].role = 'admin';
+      filtered[0].status = 'approved';
+    }
+    this.saveLocalAccounts(filtered);
+
+    // Se o usuário logado atualmente não for o master, desconectar
+    if (this.currentUser && !this.isMasterEmail(this.currentUser.email)) {
+      this.currentUser = null;
+      localStorage.removeItem(this.CURRENT_USER_KEY);
+      this.notifyListeners();
+    }
+
+    // 2. Limpeza na nuvem (Firestore system_accounts)
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      try {
+        const snap = await firebase.firestore().collection('system_accounts').get();
+        const batch = firebase.firestore().batch();
+        let deletedCount = 0;
+        snap.forEach(doc => {
+          const data = doc.data();
+          if (data && data.email && data.email.toLowerCase() !== masterEmail) {
+            batch.delete(doc.ref);
+            deletedCount++;
+          }
+        });
+        if (deletedCount > 0) {
+          await batch.commit();
+          console.log(`[Auth] ${deletedCount} conta(s) não-master foram excluídas.`);
+        }
+      } catch (e) {
+        console.warn('Aviso na limpeza do Firestore:', e);
+      }
+    }
+
     return true;
   },
 
@@ -440,7 +547,7 @@ const AuthManager = {
     const code = error.code || '';
     switch (code) {
       case 'auth/email-already-in-use':
-        return 'Este e-mail já está sendo utilizado por outra conta.';
+        return 'Este e-mail já foi solicitado ou está em uso.';
       case 'auth/invalid-email':
         return 'O endereço de e-mail informado é inválido.';
       case 'auth/weak-password':

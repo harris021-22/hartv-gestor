@@ -38,10 +38,19 @@ const App = {
       navigator.serviceWorker.register('./sw.js')
         .then((reg) => {
           console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
+          reg.update().catch(() => {});
         })
         .catch((err) => {
           console.warn('[PWA] Falha ao registrar Service Worker:', err);
         });
+
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
     }
   },
 
@@ -537,12 +546,21 @@ const App = {
       const accounts = await AuthManager.getAccountsList();
       const currentUser = AuthManager.getUser();
 
+      const purgeHeader = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
+          <span style="font-size: 0.78rem; color: var(--text-muted);">Total de contas: <strong>${accounts.length}</strong></span>
+          <button class="btn btn-danger" style="font-size: 0.72rem; padding: 5px 10px;" onclick="App.handlePurgeOtherAccounts()">
+            <span>🗑️ Excluir Outras Contas</span>
+          </button>
+        </div>
+      `;
+
       if (accounts.length === 0) {
-        container.innerHTML = '<div style="text-align: center; color: var(--text-dim); padding: 20px;">Nenhuma conta encontrada.</div>';
+        container.innerHTML = purgeHeader + '<div style="text-align: center; color: var(--text-dim); padding: 20px;">Nenhuma conta encontrada.</div>';
         return;
       }
 
-      container.innerHTML = accounts.map(acc => {
+      container.innerHTML = purgeHeader + accounts.map(acc => {
         const isCurrent = currentUser && currentUser.uid === acc.uid;
         const status = acc.status || 'pending';
         let statusBadge = '<span class="status-pill pending">⏳ Pendente</span>';
@@ -613,6 +631,15 @@ const App = {
     }
   },
 
+  // Excluir todas as outras contas exceto o Master
+  async handlePurgeOtherAccounts() {
+    if (confirm('Atenção: Deseja realmente excluir todas as outras contas e deixar APENAS andrew.g.h.agh@gmail.com?')) {
+      await AuthManager.purgeNonMasterAccounts();
+      this.showToast('Todas as outras contas foram excluídas!', 'success');
+      this.renderAccountsList();
+    }
+  },
+
   // Submit de Login
   async handleLoginSubmit(e) {
     e.preventDefault();
@@ -632,7 +659,7 @@ const App = {
     }
   },
 
-  // Submit de Cadastro
+  // Submit de Cadastro / Solicitação de Acesso
   async handleRegisterSubmit(e) {
     e.preventDefault();
     const name = document.getElementById('regName').value.trim();
@@ -643,10 +670,14 @@ const App = {
     try {
       if (submitBtn) submitBtn.disabled = true;
       const user = await AuthManager.register(name, email, pass);
-      this.showToast(`Conta criada com sucesso! Olá, ${user.displayName}!`, 'success');
+      this.showToast(`Bem-vindo, ${user.displayName}!`, 'success');
       document.getElementById('formRegister').reset();
     } catch (err) {
-      alert(err.message || 'Erro ao criar conta.');
+      alert(err.message || 'Erro ao processar cadastro.');
+      document.getElementById('formRegister').reset();
+      // Alternar para a aba de login para facilitar o fluxo do usuário
+      const tabLoginBtn = document.getElementById('tabLoginBtn');
+      if (tabLoginBtn) tabLoginBtn.click();
     } finally {
       if (submitBtn) submitBtn.disabled = false;
     }
