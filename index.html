@@ -20,7 +20,7 @@
   <link rel="shortcut icon" href="./icons/icon-64.png?v=4">
 
   <!-- Estilos -->
-  <link rel="stylesheet" href="./style.css?v=10.0">
+  <link rel="stylesheet" href="./style.css?v=11.0">
   <style>
     /* Estilos Críticos do Menu Lateral Deslizante (Garante visual perfeito mesmo com cache antigo) */
     .drawer-overlay {
@@ -288,6 +288,12 @@
     </div>
 
     <div class="header-actions">
+      <!-- Indicador de Sincronização em Tempo Real (Nuvem Firestore) -->
+      <div id="cloudSyncStatus" style="display: none; align-items: center; gap: 5px; font-size: 0.72rem; padding: 4px 9px; border-radius: 9999px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; cursor: default;" title="Sincronização em tempo real ativa">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981; display: inline-block;"></span>
+        <span id="cloudSyncText">Nuvem Conectada</span>
+      </div>
+
       <!-- Chip da Conta Conectada -->
       <div id="userProfileChip" class="user-chip" style="display: none;" title="Conta Ativa">
         <span class="user-avatar" id="userAvatarText">A</span>
@@ -939,11 +945,11 @@ service cloud.firestore {
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <!-- Scripts da Aplicação -->
-  <script src="./firebase-config.js?v=10.0"></script>
-  <script src="./auth.js?v=10.0"></script>
-  <script src="./database.js?v=10.0"></script>
-  <script src="./storage.js?v=10.0"></script>
-  <script src="./notifications.js?v=10.0"></script>
-  <script src="./app.js?v=10.0"></script>
+  <script src="./firebase-config.js?v=11.0"></script>
+  <script src="./auth.js?v=11.0"></script>
+  <script src="./database.js?v=11.0"></script>
+  <script src="./storage.js?v=11.0"></script>
+  <script src="./notifications.js?v=11.0"></script>
+  <script src="./app.js?v=11.0"></script>
 </body>
 </html>

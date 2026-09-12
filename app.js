@@ -83,27 +83,110 @@ const App = {
     });
   },
 
-  // Carregar lista de clientes do armazenamento local e nuvem
+  // Carregar lista de clientes do armazenamento local e ativar sincronização em tempo real na nuvem
   async loadClients() {
     this.clients = StorageManager.getClients();
     this.render();
 
-    // Se houver conexão com a nuvem, sincronizar em segundo plano
     const user = typeof AuthManager !== 'undefined' ? AuthManager.getUser() : null;
     if (user && typeof DatabaseManager !== 'undefined' && DatabaseManager.isAvailable()) {
-      try {
-        const cloudClients = await DatabaseManager.fetchClients(user.uid);
-        if (cloudClients && cloudClients.length > 0) {
-          // Se a lista local estiver vazia ou menor, mesclar com a da nuvem
-          if (this.clients.length === 0) {
-            StorageManager.saveClients(cloudClients);
-            this.clients = cloudClients;
-            this.render();
+      this.startRealtimeCloudSync(user.uid);
+    }
+  },
+
+  // Sincronização em tempo real bidirecional (celular <-> computador)
+  startRealtimeCloudSync(userId) {
+    if (!userId || typeof DatabaseManager === 'undefined' || !DatabaseManager.isAvailable()) return;
+
+    this.updateCloudSyncBadge(true, this.clients.length);
+
+    // 1. Escuta em tempo real para clientes (onSnapshot)
+    DatabaseManager.subscribeToClients(userId, (cloudClients) => {
+      this.handleRealtimeClientsUpdate(cloudClients, userId);
+    });
+
+    // 2. Escuta em tempo real para configurações (Pix, modelos de WhatsApp, etc.)
+    DatabaseManager.subscribeToSettings(userId, (cloudSettings) => {
+      if (cloudSettings) {
+        const localSettings = StorageManager.getSettings();
+        const merged = { ...localSettings, ...cloudSettings };
+        const key = StorageManager.getSettingsKey();
+        localStorage.setItem(key, JSON.stringify(merged));
+      }
+    });
+
+    // 3. Checagem inicial: enviar para a nuvem clientes que estejam apenas no armazenamento local deste aparelho
+    this.syncLocalToCloudIfNeeded(userId);
+  },
+
+  // Atualização instantânea recebida da nuvem
+  handleRealtimeClientsUpdate(cloudClients, userId) {
+    if (!Array.isArray(cloudClients)) return;
+
+    // Se a nuvem tiver clientes, atualizar a lista local e a interface
+    if (cloudClients.length > 0) {
+      StorageManager.saveClients(cloudClients);
+      this.clients = cloudClients;
+      this.render();
+      this.updateCloudSyncBadge(true, cloudClients.length);
+    } else {
+      // Se a nuvem estiver vazia mas localmente existirem clientes, sincronizar os locais para a nuvem
+      const local = StorageManager.getClients();
+      if (local.length > 0) {
+        DatabaseManager.syncAllClients(userId, local);
+      } else {
+        this.clients = [];
+        this.render();
+      }
+    }
+  },
+
+  // Enviar clientes locais para a nuvem se a nuvem ainda não tiver
+  async syncLocalToCloudIfNeeded(userId) {
+    const local = StorageManager.getClients();
+    if (local.length === 0) return;
+
+    try {
+      const cloudClients = await DatabaseManager.fetchClients(userId);
+      if (!cloudClients || cloudClients.length === 0) {
+        console.log(`[App] Enviando ${local.length} cliente(s) locais para a nuvem...`);
+        await DatabaseManager.syncAllClients(userId, local);
+      } else {
+        // Enviar clientes novos que estejam apenas localmente
+        const cloudIds = new Set(cloudClients.map(c => c.id));
+        const missing = local.filter(c => !cloudIds.has(c.id));
+        if (missing.length > 0) {
+          console.log(`[App] Sincronizando ${missing.length} cliente(s) novo(s) do aparelho para a nuvem...`);
+          for (const c of missing) {
+            await DatabaseManager.saveClient(userId, c);
           }
         }
-      } catch (e) {
-        console.warn('Erro na sincronização de nuvem:', e);
       }
+    } catch (e) {
+      console.warn('[App] Erro na verificação de nuvem:', e);
+    }
+  },
+
+  // Indicador visual de sincronização da nuvem
+  updateCloudSyncBadge(isConnected, count = 0) {
+    const badge = document.getElementById('cloudSyncStatus');
+    const text = document.getElementById('cloudSyncText');
+    if (!badge) return;
+
+    if (isConnected) {
+      badge.style.display = 'flex';
+      badge.style.background = 'rgba(16, 185, 129, 0.12)';
+      badge.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+      badge.style.color = '#34d399';
+      if (text) text.textContent = 'Nuvem Conectada';
+      badge.title = `Sincronização em tempo real ativa. ${count} cliente(s) sincronizados.`;
+    } else {
+      badge.style.display = 'flex';
+      badge.style.background = 'rgba(100, 116, 139, 0.12)';
+      badge.style.borderColor = 'rgba(100, 116, 139, 0.25)';
+      badge.style.color = '#94a3b8';
+      if (text) text.textContent = 'Modo Local';
+      badge.title = 'Armazenamento local (conecte sua conta para sincronização em tempo real).';
     }
   },
 
@@ -449,6 +532,11 @@ const App = {
 
     if (!user) {
       // Usuário deslogado: exibir tela de login
+      if (typeof DatabaseManager !== 'undefined') {
+        DatabaseManager.unsubscribeAll();
+      }
+      this.updateCloudSyncBadge(false);
+
       if (authScreen) authScreen.style.display = 'flex';
       if (userChip) userChip.style.display = 'none';
       if (btnManageAccounts) btnManageAccounts.style.display = 'none';
@@ -873,6 +961,10 @@ const App = {
   async handleLogout() {
     if (confirm('Deseja realmente sair da sua conta?')) {
       this.closeDrawer();
+      if (typeof DatabaseManager !== 'undefined') {
+        DatabaseManager.unsubscribeAll();
+      }
+      this.updateCloudSyncBadge(false);
       await AuthManager.logout();
       this.showToast('Você saiu da sua conta.', 'info');
     }

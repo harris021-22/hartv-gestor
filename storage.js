@@ -63,6 +63,12 @@ const StorageManager = {
     try {
       const key = this.getSettingsKey();
       localStorage.setItem(key, JSON.stringify(settings));
+
+      // Sincronizar configurações com a nuvem (Firestore)
+      if (typeof DatabaseManager !== 'undefined' && typeof AuthManager !== 'undefined' && AuthManager.getUser()) {
+        DatabaseManager.saveSettings(AuthManager.getUser().uid, settings);
+      }
+
       return true;
     } catch (e) {
       console.error('Erro ao salvar configurações:', e);
