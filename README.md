@@ -66,14 +66,26 @@ O aplicativo foi desenvolvido com tecnologia **PWA (Progressive Web App)**, o qu
 
 ---
 
+## 🔐 Sistema de Login & Múltiplas Contas Isoladas
+
+O **HarTv Gestor** possui autenticação completa integrada:
+- **Múltiplos Administradores**: Você pode criar contas diferentes (ex: `admin1@hartv.com`, `admin2@hartv.com`).
+- **Isolamento de Dados**: Cada conta vê e gerencia **apenas os seus próprios clientes**. Uma conta nunca acessa dados de outra.
+- **Sair da Conta (Logout)**: No topo, você pode clicar em **"🚪 Sair"** a qualquer momento para entrar com outra conta.
+- **Sincronização com Firebase (Google Cloud)**:
+  - O app já inclui os arquivos `firebase-config.js` e `firestore.rules`.
+  - Para conectar ao seu banco de dados na nuvem, crie um projeto gratuito no [console.firebase.google.com](https://console.firebase.google.com), ative o **Authentication (E-mail/Senha)** e o **Cloud Firestore**, e cole suas chaves no arquivo `firebase-config.js`.
+  - Copie as regras do arquivo `firestore.rules` para a aba **Rules** do Firestore para garantir bloqueio total contra invasões.
+
+---
+
 ## 💻 Como Rodar no Computador / Testar Localmente
 
 Basta abrir o arquivo `index.html` diretamente em qualquer navegador moderno (Chrome, Edge, Brave, Firefox) ou iniciar um servidor local com Node.js:
 
 ```bash
 # Iniciar servidor local rápido:
-npx serve .
-# Ou com python:
-python -m http.server 8080
+node server.js
 ```
-Depois, acesse pelo navegador: `http://localhost:8080`
+Depois, acesse pelo navegador: `http://localhost:3000/`
+

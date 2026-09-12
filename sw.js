@@ -1,14 +1,17 @@
 // Service Worker - IPTV Gestor Pro
 // Suporte offline completo e notificações no Android
 
-const CACHE_NAME = 'hartv-gestor-v2';
+const CACHE_NAME = 'hartv-gestor-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css',
-  './app.js',
+  './firebase-config.js',
+  './auth.js',
+  './database.js',
   './storage.js',
   './notifications.js',
+  './app.js',
   './manifest.json',
   './icons/icon.svg',
   './icons/icon-192.png',

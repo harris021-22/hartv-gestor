@@ -2,8 +2,24 @@
 // Sem necessidade de banco de dados na nuvem
 
 const StorageManager = {
-  CLIENTS_KEY: 'iptv_clients_data',
-  SETTINGS_KEY: 'iptv_settings_data',
+  LEGACY_CLIENTS_KEY: 'iptv_clients_data',
+  LEGACY_SETTINGS_KEY: 'iptv_settings_data',
+
+  // Obter chave de clientes isolada por usuário
+  getClientsKey() {
+    if (typeof AuthManager !== 'undefined' && AuthManager.getUser()) {
+      return `hartv_clients_${AuthManager.getUser().uid}`;
+    }
+    return 'hartv_clients_guest';
+  },
+
+  // Obter chave de configurações isolada por usuário
+  getSettingsKey() {
+    if (typeof AuthManager !== 'undefined' && AuthManager.getUser()) {
+      return `hartv_settings_${AuthManager.getUser().uid}`;
+    }
+    return 'hartv_settings_guest';
+  },
 
   // Configurações padrão
   defaultSettings: {
@@ -19,7 +35,14 @@ const StorageManager = {
   // Obter configurações
   getSettings() {
     try {
-      const data = localStorage.getItem(this.SETTINGS_KEY);
+      const key = this.getSettingsKey();
+      let data = localStorage.getItem(key);
+      
+      // Fallback para legado se ainda não tiver na chave do usuário
+      if (!data) {
+        data = localStorage.getItem(this.LEGACY_SETTINGS_KEY);
+      }
+
       if (!data) return { ...this.defaultSettings };
       const parsed = JSON.parse(data);
       return {
@@ -38,7 +61,8 @@ const StorageManager = {
   // Salvar configurações
   saveSettings(settings) {
     try {
-      localStorage.setItem(this.SETTINGS_KEY, JSON.stringify(settings));
+      const key = this.getSettingsKey();
+      localStorage.setItem(key, JSON.stringify(settings));
       return true;
     } catch (e) {
       console.error('Erro ao salvar configurações:', e);
@@ -46,10 +70,21 @@ const StorageManager = {
     }
   },
 
-  // Obter todos os clientes
+  // Obter todos os clientes (isolados pelo usuário ativo)
   getClients() {
     try {
-      const data = localStorage.getItem(this.CLIENTS_KEY);
+      const key = this.getClientsKey();
+      let data = localStorage.getItem(key);
+
+      // Migração automática transparente dos clientes legados para o primeiro usuário logado
+      if (!data && key !== 'hartv_clients_guest') {
+        const legacyData = localStorage.getItem(this.LEGACY_CLIENTS_KEY);
+        if (legacyData) {
+          localStorage.setItem(key, legacyData);
+          data = legacyData;
+        }
+      }
+
       return data ? JSON.parse(data) : [];
     } catch (e) {
       console.error('Erro ao ler clientes do LocalStorage:', e);
@@ -60,7 +95,8 @@ const StorageManager = {
   // Salvar lista completa de clientes
   saveClients(clients) {
     try {
-      localStorage.setItem(this.CLIENTS_KEY, JSON.stringify(clients));
+      const key = this.getClientsKey();
+      localStorage.setItem(key, JSON.stringify(clients));
       return true;
     } catch (e) {
       console.error('Erro ao salvar clientes:', e);
@@ -92,6 +128,12 @@ const StorageManager = {
     }
 
     this.saveClients(clients);
+
+    // Sincronizar com banco de dados na nuvem se disponível
+    if (typeof DatabaseManager !== 'undefined' && typeof AuthManager !== 'undefined' && AuthManager.getUser()) {
+      DatabaseManager.saveClient(AuthManager.getUser().uid, client);
+    }
+
     return client;
   },
 
@@ -100,6 +142,12 @@ const StorageManager = {
     const clients = this.getClients();
     const filtered = clients.filter(c => c.id !== id);
     this.saveClients(filtered);
+
+    // Sincronizar exclusão com a nuvem
+    if (typeof DatabaseManager !== 'undefined' && typeof AuthManager !== 'undefined' && AuthManager.getUser()) {
+      DatabaseManager.deleteClient(AuthManager.getUser().uid, id);
+    }
+
     return filtered.length !== clients.length;
   },
 

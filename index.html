@@ -48,6 +48,15 @@
     </div>
 
     <div class="header-actions">
+      <!-- Chip da Conta Conectada -->
+      <div id="userProfileChip" class="user-chip" style="display: none;" title="Conta Ativa">
+        <span class="user-avatar" id="userAvatarText">A</span>
+        <span class="user-name-text" id="userNameText">admin</span>
+        <button id="btnLogout" class="logout-btn" title="Trocar de Conta / Sair">
+          <span>🚪 Sair</span>
+        </button>
+      </div>
+
       <!-- Botão Notificações -->
       <button id="btnNotifications" class="icon-btn" title="Notificações e Alertas">
         <span>🔔</span>
@@ -455,7 +464,75 @@
   <!-- Toast Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <!-- Scripts -->
+  <!-- TELA DE AUTENTICAÇÃO (LOGIN / CADASTRO) -->
+  <div id="authScreen" class="auth-overlay" style="display: none;">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-logo" style="width: 52px; height: 52px; margin: 0 auto 10px;">
+          <svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="512" height="512" rx="100" fill="#0f172a" stroke="#06b6d4" stroke-width="12" />
+            <polygon points="200,160 200,352 352,256" fill="#06b6d4" />
+          </svg>
+        </div>
+        <h1 class="brand-title" style="font-size: 1.4rem; text-align: center;">HarTv Gestor</h1>
+        <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 4px;">Acesso seguro e isolado ao painel</p>
+      </div>
+
+      <!-- Abas Entrar / Criar Conta -->
+      <div class="auth-tabs">
+        <button type="button" id="tabLoginBtn" class="auth-tab active">Entrar</button>
+        <button type="button" id="tabRegisterBtn" class="auth-tab">Criar Conta</button>
+      </div>
+
+      <!-- Form Login -->
+      <form id="formLogin" class="auth-form">
+        <div class="form-group">
+          <label class="form-label" for="loginEmail">E-mail ou Usuário</label>
+          <input type="email" id="loginEmail" class="form-input" placeholder="seuemail@exemplo.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="loginPassword">Senha</label>
+          <input type="password" id="loginPassword" class="form-input" placeholder="Sua senha secreta" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="btnLoginSubmit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
+          <span>🚀 Entrar no Painel</span>
+        </button>
+      </form>
+
+      <!-- Form Cadastro -->
+      <form id="formRegister" class="auth-form" style="display: none;">
+        <div class="form-group">
+          <label class="form-label" for="regName">Nome da Conta / Administrador</label>
+          <input type="text" id="regName" class="form-input" placeholder="Ex: Admin 1" required autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="regEmail">E-mail</label>
+          <input type="email" id="regEmail" class="form-input" placeholder="seuemail@exemplo.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="regPassword">Criar Senha (mínimo 6 dígitos)</label>
+          <input type="password" id="regPassword" class="form-input" placeholder="Mínimo 6 caracteres" minlength="6" required autocomplete="new-password">
+        </div>
+        <button type="submit" id="btnRegisterSubmit" class="btn btn-success" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
+          <span>✨ Criar Conta Privada</span>
+        </button>
+      </form>
+
+      <div class="auth-security-badge">
+        🔒 Cada conta acessa apenas os seus próprios clientes com segurança total.
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs (Compat para navegadores / GitHub Pages) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <!-- Scripts da Aplicação -->
+  <script src="./firebase-config.js"></script>
+  <script src="./auth.js"></script>
+  <script src="./database.js"></script>
   <script src="./storage.js"></script>
   <script src="./notifications.js"></script>
   <script src="./app.js"></script>

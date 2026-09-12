@@ -15,11 +15,18 @@ const App = {
 
   // Inicialização
   init() {
-    this.loadClients();
     this.setupEventListeners();
     this.setupPWAInstall();
     this.setupServiceWorker();
     this.updateNotificationBadge();
+
+    // Inicializar autenticação e multi-contas
+    if (typeof AuthManager !== 'undefined') {
+      AuthManager.onAuthStateChanged((user) => this.handleAuthState(user));
+      AuthManager.init();
+    } else {
+      this.loadClients();
+    }
 
     // Iniciar checagem de vencimento com NotificationManager
     NotificationManager.init(() => this.clients);
@@ -67,10 +74,28 @@ const App = {
     });
   },
 
-  // Carregar lista de clientes do armazenamento local
-  loadClients() {
+  // Carregar lista de clientes do armazenamento local e nuvem
+  async loadClients() {
     this.clients = StorageManager.getClients();
     this.render();
+
+    // Se houver conexão com a nuvem, sincronizar em segundo plano
+    const user = typeof AuthManager !== 'undefined' ? AuthManager.getUser() : null;
+    if (user && typeof DatabaseManager !== 'undefined' && DatabaseManager.isAvailable()) {
+      try {
+        const cloudClients = await DatabaseManager.fetchClients(user.uid);
+        if (cloudClients && cloudClients.length > 0) {
+          // Se a lista local estiver vazia ou menor, mesclar com a da nuvem
+          if (this.clients.length === 0) {
+            StorageManager.saveClients(cloudClients);
+            this.clients = cloudClients;
+            this.render();
+          }
+        }
+      } catch (e) {
+        console.warn('Erro na sincronização de nuvem:', e);
+      }
+    }
   },
 
   // Configurar ouvintes de eventos da interface
@@ -223,6 +248,111 @@ const App = {
         if (e.target === modal) this.closeAllModals();
       });
     });
+
+    // Eventos de Autenticação (Login / Cadastro / Logout)
+    const tabLoginBtn = document.getElementById('tabLoginBtn');
+    const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+    const formLogin = document.getElementById('formLogin');
+    const formRegister = document.getElementById('formRegister');
+
+    if (tabLoginBtn && tabRegisterBtn && formLogin && formRegister) {
+      tabLoginBtn.addEventListener('click', () => {
+        tabLoginBtn.classList.add('active');
+        tabRegisterBtn.classList.remove('active');
+        formLogin.style.display = 'flex';
+        formRegister.style.display = 'none';
+      });
+
+      tabRegisterBtn.addEventListener('click', () => {
+        tabRegisterBtn.classList.add('active');
+        tabLoginBtn.classList.remove('active');
+        formRegister.style.display = 'flex';
+        formLogin.style.display = 'none';
+      });
+
+      formLogin.addEventListener('submit', (e) => this.handleLoginSubmit(e));
+      formRegister.addEventListener('submit', (e) => this.handleRegisterSubmit(e));
+    }
+
+    const btnLogout = document.getElementById('btnLogout');
+    if (btnLogout) {
+      btnLogout.addEventListener('click', () => this.handleLogout());
+    }
+  },
+
+  // Gerenciamento do estado da autenticação (UI)
+  handleAuthState(user) {
+    const authScreen = document.getElementById('authScreen');
+    const userChip = document.getElementById('userProfileChip');
+    const userAvatarText = document.getElementById('userAvatarText');
+    const userNameText = document.getElementById('userNameText');
+
+    if (!user) {
+      // Usuário deslogado: exibir tela de login
+      if (authScreen) authScreen.style.display = 'flex';
+      if (userChip) userChip.style.display = 'none';
+      this.clients = [];
+      this.render();
+    } else {
+      // Usuário logado: esconder tela de login e mostrar app
+      if (authScreen) authScreen.style.display = 'none';
+      if (userChip) {
+        userChip.style.display = 'flex';
+        const name = user.displayName || user.email.split('@')[0];
+        if (userAvatarText) userAvatarText.textContent = name.charAt(0).toUpperCase();
+        if (userNameText) userNameText.textContent = name;
+      }
+
+      // Carregar os clientes específicos desta conta
+      this.loadClients();
+    }
+  },
+
+  // Submit de Login
+  async handleLoginSubmit(e) {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass = document.getElementById('loginPassword').value.trim();
+    const submitBtn = document.getElementById('btnLoginSubmit');
+
+    try {
+      if (submitBtn) submitBtn.disabled = true;
+      const user = await AuthManager.login(email, pass);
+      this.showToast(`Bem-vindo, ${user.displayName}!`, 'success');
+      document.getElementById('formLogin').reset();
+    } catch (err) {
+      alert(err.message || 'Erro ao realizar login.');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  },
+
+  // Submit de Cadastro
+  async handleRegisterSubmit(e) {
+    e.preventDefault();
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const pass = document.getElementById('regPassword').value.trim();
+    const submitBtn = document.getElementById('btnRegisterSubmit');
+
+    try {
+      if (submitBtn) submitBtn.disabled = true;
+      const user = await AuthManager.register(name, email, pass);
+      this.showToast(`Conta criada com sucesso! Olá, ${user.displayName}!`, 'success');
+      document.getElementById('formRegister').reset();
+    } catch (err) {
+      alert(err.message || 'Erro ao criar conta.');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  },
+
+  // Sair da Conta (Logout)
+  async handleLogout() {
+    if (confirm('Deseja realmente sair da sua conta?')) {
+      await AuthManager.logout();
+      this.showToast('Você saiu da sua conta.', 'info');
+    }
   },
 
   // Cálculo de dias restantes e status
