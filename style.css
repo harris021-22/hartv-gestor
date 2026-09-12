@@ -682,7 +682,8 @@ body {
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   width: 100%;
   max-width: 580px;
-  max-height: 90vh;
+  max-height: 85vh;
+  max-height: 85dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -691,10 +692,20 @@ body {
   box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.7);
 }
 
+.modal-content > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  height: 100%;
+}
+
 @media (min-width: 600px) {
   .modal-content {
     border-radius: var(--radius-lg);
     transform: scale(0.95);
+    max-height: 90vh;
   }
 }
 
@@ -714,6 +725,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .modal-title {
@@ -735,6 +747,9 @@ body {
 .modal-body {
   padding: 20px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -802,12 +817,15 @@ body {
 
 .modal-footer {
   padding: 14px 20px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  background: rgba(11, 16, 28, 0.7);
+  background: #0d1424;
+  flex-shrink: 0;
+  z-index: 10;
 }
 
 .btn {
