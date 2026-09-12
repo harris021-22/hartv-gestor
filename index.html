@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste Científico de Alta Precisão: Tu é gay? 😂🏳️‍🌈</title>
+  
+  <!-- Fontes do Google: Outfit e Playfair Display -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+  
+  <!-- Estilos principais -->
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%200%20100%20100%22><text y=%22.9em%22 font-size=%2290%22>🏳️‍🌈</text></svg>">
+</head>
+<body>
+  <!-- Canvas de partículas de fundo -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Brilhos de ambientação (Luzes bokeh) -->
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+  <div class="ambient-glow glow-3"></div>
+
+  <!-- Botão de controle de som suave -->
+  <button id="sound-toggle" class="sound-btn" aria-label="Ativar ou desativar efeitos sonoros" title="Ativar/Desativar Som">
+    <span id="sound-icon">🔊</span>
+    <span class="sound-tooltip">Som ativado</span>
+  </button>
+
+  <main class="page-container">
+    <!-- Card Principal: A Pergunta -->
+    <div class="card proposal-card" id="proposal-card">
+      
+      <!-- Tag / Badge de Humor -->
+      <div class="love-badge">
+        <span class="pulse-dot"></span>
+        <span>Detector da Verdade: Seja sincero(a)</span>
+        <span class="heart-icon">🧐</span>
+      </div>
+
+      <!-- Ilustração / Avatar Meme com Halo -->
+      <div class="ring-illustration" aria-hidden="true">
+        <div class="ring-halo"></div>
+        <div class="ring-wrapper">
+          <div class="meme-avatar">
+            <span class="avatar-emoji">🤨</span>
+            <span class="avatar-badge">🏳️‍🌈</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Título de Impacto -->
+      <h1 class="proposal-title">
+        Tu é <span class="highlight-text">gay?</span>
+      </h1>
+
+      <p class="proposal-subtitle">
+        Uma pesquisa científica de alta precisão tecnológica. O detector de mentiras está ligado... responda a verdade absoluta!
+      </p>
+
+      <!-- Feedback dinâmico e engraçado das tentativas do Não -->
+      <div id="escape-counter" class="escape-counter" aria-live="polite"></div>
+
+      <!-- Área de Interação dos Botões -->
+      <div class="actions-container" id="actions-box">
+        <!-- Botão SIM -->
+        <button id="btn-sim" class="btn btn-primary" type="button">
+          <span class="btn-sparkle">✨</span>
+          <span class="btn-text">SIM! 🏳️‍🌈</span>
+          <span class="btn-heart">💅</span>
+        </button>
+
+        <!-- Botão NÃO (O fujão) -->
+        <button id="btn-nao" class="btn btn-secondary" type="button">
+          <span class="btn-text" id="nao-text">Não</span>
+        </button>
+      </div>
+
+      <!-- Dica humorística -->
+      <p class="tender-note">
+        💡 <em>Dica: Tentar clicar no 'Não' costuma ser uma missão fisicamente impossível...</em>
+      </p>
+    </div>
+
+    <!-- Card de Celebração (Aparece ao clicar em SIM) -->
+    <div class="card celebration-card hidden" id="celebration-card" aria-hidden="true">
+      <div class="celebration-icon-box">
+        <span class="heart-burst">🏳️‍🌈</span>
+        <span class="celebration-ring">💅</span>
+        <span class="heart-burst">✨</span>
+      </div>
+
+      <span class="success-pill">Confirmação Oficial Registrada! 🏆</span>
+
+      <h2 class="celebration-title">
+        EU JÁ <span class="gradient-gold">SABIA!</span> 😂
+      </h2>
+
+      <p class="celebration-romantic-quote">
+        "Com muito orgulho, glamour, purpurina e atitude!"
+      </p>
+
+      <!-- Caixa de Informações -->
+      <div class="love-details-box">
+        <div class="detail-item">
+          <span class="detail-label">Status do Teste</span>
+          <span class="detail-value">100% Confirmado 🏳️‍🌈</span>
+        </div>
+        <div class="detail-divider"></div>
+        <div class="detail-item">
+          <span class="detail-label">Momento da Confissão</span>
+          <span class="detail-value" id="current-timestamp">Carregando momento...</span>
+        </div>
+      </div>
+
+      <!-- Mensagem Revelada -->
+      <div class="love-letter">
+        <div class="letter-stamp">💌</div>
+        <p class="letter-text">
+          Parabéns pela coragem e sinceridade! Não adiantava nada tentar clicar no 'Não', porque o destino já estava traçado. Agora manda esse teste pros seus amigos pra ver quem mais vai tentar fugir da verdade! 😂✨
+        </p>
+        <span class="letter-sign">Divou com sucesso! 💅✨</span>
+      </div>
+
+      <!-- Botões de Ação na Celebração -->
+      <div class="celebration-actions">
+        <button id="btn-confetti-more" class="btn btn-celebrate" type="button">
+          🎉 Mais Purpurina & Confetes!
+        </button>
+        <button id="btn-restart" class="btn btn-link" type="button">
+          ↺ Testar outro amigo
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="page-footer">
+    <p>Feito com bom humor, purpurina e muita alegria 🌈✨</p>
+  </footer>
+
+  <!-- Script da Landing Page -->
+  <script src="script.js"></script>
+</body>
+</html>
