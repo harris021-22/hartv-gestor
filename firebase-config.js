@@ -1,14 +1,13 @@
-// firebase-config.js - Configuração do Banco de Dados Firebase (Google Cloud)
-// Para ativar a sincronização na nuvem, cole suas chaves gratuitas do Firebase abaixo.
-// O app funciona com múltiplas contas isoladas mesmo antes de colar as chaves!
+// firebase-config.js - Configuração oficial do Firebase (Google Cloud) para HarTv Gestor
 
 const firebaseConfig = {
-  apiKey: "SUA_API_KEY_AQUI",
-  authDomain: "SEU_PROJETO.firebaseapp.com",
-  projectId: "SEU_PROJETO_ID",
-  storageBucket: "SEU_PROJETO.appspot.com",
-  messagingSenderId: "SEU_SENDER_ID",
-  appId: "SEU_APP_ID"
+  apiKey: "AIzaSyDCw8jFf1kLmoOrfiJ2cvYqt3YTIx6rDe8",
+  authDomain: "hartv-gestor.firebaseapp.com",
+  projectId: "hartv-gestor",
+  storageBucket: "hartv-gestor.firebasestorage.app",
+  messagingSenderId: "141988470343",
+  appId: "1:141988470343:web:04a21057c4a2f3d08edb62",
+  measurementId: "G-2LGHB93YWN"
 };
 
 // Verificar se o Firebase foi preenchido pelo usuário
