@@ -264,23 +264,17 @@ const App = {
     const formLogin = document.getElementById('formLogin');
     const formRegister = document.getElementById('formRegister');
 
-    if (tabLoginBtn && tabRegisterBtn && formLogin && formRegister) {
-      tabLoginBtn.addEventListener('click', () => {
-        tabLoginBtn.classList.add('active');
-        tabRegisterBtn.classList.remove('active');
-        formLogin.style.display = 'flex';
-        formRegister.style.display = 'none';
-      });
-
-      tabRegisterBtn.addEventListener('click', () => {
-        tabRegisterBtn.classList.add('active');
-        tabLoginBtn.classList.remove('active');
-        formRegister.style.display = 'flex';
-        formLogin.style.display = 'none';
-      });
-
-      formLogin.addEventListener('submit', (e) => this.handleLoginSubmit(e));
-      formRegister.addEventListener('submit', (e) => this.handleRegisterSubmit(e));
+    if (tabLoginBtn) {
+      tabLoginBtn.onclick = () => this.switchAuthTab('login');
+    }
+    if (tabRegisterBtn) {
+      tabRegisterBtn.onclick = () => this.switchAuthTab('register');
+    }
+    if (formLogin) {
+      formLogin.onsubmit = (e) => this.handleLoginSubmit(e);
+    }
+    if (formRegister) {
+      formRegister.onsubmit = (e) => this.handleRegisterSubmit(e);
     }
 
     const btnLogout = document.getElementById('btnLogout');
@@ -563,6 +557,25 @@ const App = {
             </button>
           </div>
         </div>
+
+        <!-- Atalho de Regras do Firestore para sincronização na Nuvem -->
+        <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 10px; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <span style="font-size: 0.78rem; font-weight: 700; color: #fbbf24;">🔥 Regras do Firestore (Sincronização na Nuvem)</span>
+            <span style="font-size: 0.7rem; color: var(--text-muted);">hartv-gestor</span>
+          </div>
+          <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
+            Para que suas aprovações alcancem os celulares dos outros usuários sem erro de permissão, publique as regras no Firebase:
+          </p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary" style="font-size: 0.72rem; padding: 6px 10px;" onclick="App.copyFirestoreRules()">
+              <span>📋 Copiar Regras</span>
+            </button>
+            <a href="https://console.firebase.google.com/project/hartv-gestor/firestore/rules" target="_blank" class="btn btn-primary" style="font-size: 0.72rem; padding: 6px 10px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+              <span>🔗 Abrir Regras no Firebase</span>
+            </a>
+          </div>
+        </div>
       `;
 
       if (accounts.length === 0) {
@@ -624,12 +637,31 @@ const App = {
     }
   },
 
+  // Copiar regras do Firestore para área de transferência
+  copyFirestoreRules() {
+    const rules = `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /system_accounts/{document=**} {\n      allow read, write: if true;\n    }\n    match /users/{userId}/{document=**} {\n      allow read, write: if request.auth != null && request.auth.uid == userId;\n    }\n  }\n}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(rules).then(() => {
+        this.showToast('Regras copiadas! Cole no Console do Firebase e clique em Publicar.', 'success');
+      }).catch(() => {
+        prompt('Copie as regras abaixo (Ctrl+C):', rules);
+      });
+    } else {
+      prompt('Copie as regras abaixo (Ctrl+C):', rules);
+    }
+  },
+
   // Ações de Aprovação / Bloqueio pelo Admin
   async handleApproveAccount(uid, name, email) {
     try {
       this.showToast(`Liberando conta de "${name}"...`, 'info');
-      await AuthManager.updateAccountStatus(uid, 'approved', email);
-      this.showToast(`✅ Conta de "${name}" aprovada e liberada com sucesso!`, 'success');
+      const res = await AuthManager.updateAccountStatus(uid, 'approved', email);
+      if (res && !res.cloudSynced) {
+        this.showToast(`⚠️ Conta de "${name}" aprovada localmente! (Pendente de regras no Firebase)`, 'warning');
+        this.showFirestoreRulesModal();
+      } else {
+        this.showToast(`✅ Conta de "${name}" aprovada e liberada com sucesso!`, 'success');
+      }
       await this.renderAccountsList();
     } catch (err) {
       alert('Aviso: ' + (err.message || err));
@@ -673,13 +705,28 @@ const App = {
     }
     try {
       this.showToast(`Liberando acesso para ${email}...`, 'info');
-      await AuthManager.updateAccountStatus(null, 'approved', email);
-      this.showToast(`✅ Acesso de ${email} liberado com sucesso!`, 'success');
+      const res = await AuthManager.updateAccountStatus(null, 'approved', email);
+      if (res && !res.cloudSynced) {
+        this.showToast(`⚠️ Acesso de ${email} liberado localmente! (Pendente de regras no Firebase)`, 'warning');
+        this.showFirestoreRulesModal();
+      } else {
+        this.showToast(`✅ Acesso de ${email} liberado com sucesso!`, 'success');
+      }
       input.value = '';
       await this.renderAccountsList();
     } catch (err) {
       alert('Aviso: ' + (err.message || err));
       await this.renderAccountsList();
+    }
+  },
+
+  // Modal com instruções para publicação das regras no Firebase
+  showFirestoreRulesModal() {
+    const modal = document.getElementById('firestoreRulesModal');
+    if (modal) {
+      modal.classList.add('open');
+    } else {
+      alert('⚠️ ATENÇÃO: Falta publicar as regras no Firebase Console!\n\nA conta foi liberada no seu aparelho, mas para que o celular dos outros usuários também receba a liberação via nuvem, você precisa publicar as regras no Console do Firebase (leva 30 segundos).\n\nClique no botão "📋 Copiar Regras" e depois em "🔗 Abrir Regras no Firebase" na tela de Gerenciar Acessos.');
     }
   },
 
@@ -751,9 +798,13 @@ const App = {
     }
   },
 
+  isRegistering: false,
+
   // Submit de Cadastro / Solicitação de Acesso
   async handleRegisterSubmit(e) {
     if (e && e.preventDefault) e.preventDefault();
+    if (this.isRegistering) return;
+
     const nameInput = document.getElementById('regName');
     const emailInput = document.getElementById('regEmail');
     const passInput = document.getElementById('regPassword');
@@ -775,9 +826,10 @@ const App = {
     const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
 
     try {
+      this.isRegistering = true;
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span>⏳ Criando e enviando solicitação...</span>';
+        submitBtn.innerHTML = '<span>⏳ Enviando solicitação...</span>';
       }
 
       const result = await AuthManager.register(name, email, pass);
@@ -799,8 +851,17 @@ const App = {
         if (formReg) formReg.reset();
       }
     } catch (err) {
-      alert(err.message || 'Erro ao processar cadastro.');
+      const msg = err.message || String(err);
+      if (msg.includes('já possui cadastro') || msg.includes('email-already-in-use')) {
+        alert('ℹ️ Este e-mail já foi solicitado/cadastrado no sistema!\n\nSe você já solicitou o acesso, aguarde a liberação do administrador (andrew.g.h.agh@gmail.com).\n\nEstamos alternando para a aba de Login.');
+        const loginEmail = document.getElementById('loginEmail');
+        if (loginEmail) loginEmail.value = email;
+        this.switchAuthTab('login');
+      } else {
+        alert(msg || 'Erro ao processar cadastro.');
+      }
     } finally {
+      this.isRegistering = false;
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalBtnText || '<span>✨ Criar Conta (Solicitar Acesso)</span>';

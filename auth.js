@@ -281,6 +281,18 @@ const AuthManager = {
           };
         }
       } catch (fbErr) {
+        if (fbErr && (fbErr.code === 'auth/email-already-in-use' || String(fbErr).includes('email-already-in-use'))) {
+          // Registrar localmente para que apareça na lista de aprovação do Admin
+          const accountData = {
+            uid: 'usr_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_'),
+            email: cleanEmail,
+            displayName: cleanName,
+            status: initialStatus,
+            role: initialRole,
+            createdAt: new Date().toISOString()
+          };
+          this.saveAccountLocally(accountData);
+        }
         throw new Error(this.translateFirebaseError(fbErr));
       }
     }
@@ -659,13 +671,20 @@ const AuthManager = {
     this.saveLocalAccounts(accounts);
 
     if (firestoreError) {
-      if (firestoreError.message && firestoreError.message.includes('permission')) {
-        throw new Error(`Permissão negada no Firebase Cloud (Missing or insufficient permissions).\n\nAs Regras de Segurança do Firestore no seu Console do Firebase precisam ser publicadas para permitir a sincronização das contas.\n\nVeja as instruções na conversa para publicar a regra em 1 minuto.`);
-      }
-      throw new Error(`Status gravado localmente, mas a sincronização na nuvem (Firestore) falhou: ${firestoreError.message}`);
+      console.warn('[Auth] Status gravado localmente, mas a sincronização no Firestore falhou:', firestoreError);
+      return {
+        success: true,
+        localSaved: true,
+        cloudSynced: false,
+        firestoreError: firestoreError
+      };
     }
 
-    return true;
+    return {
+      success: true,
+      localSaved: true,
+      cloudSynced: true
+    };
   },
 
   // EXCLUIR UMA CONTA ESPECÍFICA

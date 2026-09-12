@@ -14,13 +14,13 @@
   <meta name="description" content="Aplicativo para gerenciar clientes, assinaturas e vencimentos de IPTV no Android sem banco de dados.">
 
   <!-- Manifest e Ícones -->
-  <link rel="manifest" href="./manifest.json?v=3">
-  <link rel="icon" type="image/png" href="./icons/icon-64.png?v=3">
-  <link rel="apple-touch-icon" href="./icons/icon-192.png?v=3">
-  <link rel="shortcut icon" href="./icons/icon-64.png?v=3">
+  <link rel="manifest" href="./manifest.json?v=4">
+  <link rel="icon" type="image/png" href="./icons/icon-64.png?v=4">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png?v=4">
+  <link rel="shortcut icon" href="./icons/icon-64.png?v=4">
 
   <!-- Estilos -->
-  <link rel="stylesheet" href="./style.css?v=3.0">
+  <link rel="stylesheet" href="./style.css?v=9.0">
   <style>
     /* Estilos Críticos do Menu Lateral Deslizante (Garante visual perfeito mesmo com cache antigo) */
     .drawer-overlay {
@@ -745,8 +745,31 @@
     </div>
   </div>
 
-  <!-- Toast Container -->
-  <div id="toastContainer" class="toast-container"></div>
+  <!-- SCRIPT INLINE PARA GARANTIR ALTERNÂNCIA DE ABAS DE LOGIN/CADASTRO -->
+  <script>
+    function switchAuthTab(tab) {
+      var tabLogin = document.getElementById('tabLoginBtn');
+      var tabReg = document.getElementById('tabRegisterBtn');
+      var formLogin = document.getElementById('formLogin');
+      var formReg = document.getElementById('formRegister');
+      if (tab === 'register') {
+        if (tabReg) tabReg.className = 'auth-tab active';
+        if (tabLogin) tabLogin.className = 'auth-tab';
+        if (formReg) formReg.style.display = 'flex';
+        if (formLogin) formLogin.style.display = 'none';
+        var regName = document.getElementById('regName');
+        if (regName) regName.focus();
+      } else {
+        if (tabLogin) tabLogin.className = 'auth-tab active';
+        if (tabReg) tabReg.className = 'auth-tab';
+        if (formLogin) formLogin.style.display = 'flex';
+        if (formReg) formReg.style.display = 'none';
+        var loginEmail = document.getElementById('loginEmail');
+        if (loginEmail) loginEmail.focus();
+      }
+    }
+    window.switchAuthTab = switchAuthTab;
+  </script>
 
   <!-- TELA DE AUTENTICAÇÃO (LOGIN / CADASTRO) -->
   <div id="authScreen" class="auth-overlay" style="display: none;">
@@ -761,8 +784,8 @@
 
       <!-- Abas Entrar / Criar Conta -->
       <div class="auth-tabs">
-        <button type="button" id="tabLoginBtn" class="auth-tab active" onclick="App.switchAuthTab('login')">Entrar</button>
-        <button type="button" id="tabRegisterBtn" class="auth-tab" onclick="App.switchAuthTab('register')">Criar Conta</button>
+        <button type="button" id="tabLoginBtn" class="auth-tab active" onclick="switchAuthTab('login')">Entrar</button>
+        <button type="button" id="tabRegisterBtn" class="auth-tab" onclick="switchAuthTab('register')">Criar Conta</button>
       </div>
 
       <!-- Form Login -->
@@ -856,17 +879,59 @@
     </div>
   </div>
 
+  <!-- MODAL: Instruções de Regras do Firestore -->
+  <div id="firestoreRulesModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 520px; border: 1px solid rgba(245, 158, 11, 0.4);">
+      <div class="modal-header" style="background: rgba(245, 158, 11, 0.1);">
+        <h2 class="modal-title" style="color: #fbbf24;">🔥 Publicar Regras no Firebase</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="line-height: 1.5; font-size: 0.85rem;">
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 10px; margin-bottom: 12px; color: #a7f3d0;">
+          ✅ <strong>Conta liberada neste aparelho!</strong><br>
+          Para que a aprovação alcance automaticamente os celulares dos outros usuários, falta apenas publicar a regra no Console do Firebase (1 minuto).
+        </div>
+        <p style="margin-bottom: 8px; font-weight: 600;">Passo a passo rápido:</p>
+        <ol style="margin-left: 18px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 6px; color: var(--text-muted);">
+          <li>Clique no botão <strong>"📋 Copiar Regras"</strong> abaixo.</li>
+          <li>Clique em <strong>"🔗 Abrir Firebase Console"</strong>.</li>
+          <li>Cole no editor e clique no botão azul <strong>"Publicar" (Publish)</strong>.</li>
+        </ol>
+        <div style="background: rgba(0, 0, 0, 0.4); border-radius: 6px; padding: 10px; font-family: monospace; font-size: 0.74rem; color: #38bdf8; max-height: 110px; overflow-y: auto; white-space: pre;">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /system_accounts/{document=**} {
+      allow read, write: if true;
+    }
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}</div>
+      </div>
+      <div class="modal-footer" style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button type="button" class="btn btn-secondary" onclick="App.copyFirestoreRules()">
+          <span>📋 Copiar Regras</span>
+        </button>
+        <a href="https://console.firebase.google.com/project/hartv-gestor/firestore/rules" target="_blank" class="btn btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+          <span>🔗 Abrir Firebase Console</span>
+        </a>
+        <button type="button" class="btn btn-secondary modal-cancel">Entendi</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Firebase SDKs (Compat para navegadores / GitHub Pages) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <!-- Scripts da Aplicação -->
-  <script src="./firebase-config.js?v=7.0"></script>
-  <script src="./auth.js?v=7.0"></script>
-  <script src="./database.js?v=7.0"></script>
-  <script src="./storage.js?v=7.0"></script>
-  <script src="./notifications.js?v=7.0"></script>
-  <script src="./app.js?v=7.0"></script>
+  <script src="./firebase-config.js?v=9.0"></script>
+  <script src="./auth.js?v=9.0"></script>
+  <script src="./database.js?v=9.0"></script>
+  <script src="./storage.js?v=9.0"></script>
+  <script src="./notifications.js?v=9.0"></script>
+  <script src="./app.js?v=9.0"></script>
 </body>
 </html>
