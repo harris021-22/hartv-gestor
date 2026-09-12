@@ -1017,12 +1017,16 @@ const App = {
       if (this.searchQuery) {
         const name = (client.name || '').toLowerCase();
         const username = (client.username || '').toLowerCase();
+        const mac = (client.mac || '').toLowerCase();
+        const deviceKey = (client.deviceKey || client.key || '').toLowerCase();
         const server = (client.server || '').toLowerCase();
         const app = (client.app || '').toLowerCase();
         const whatsapp = (client.whatsapp || '').toLowerCase();
 
         return name.includes(this.searchQuery) ||
                username.includes(this.searchQuery) ||
+               mac.includes(this.searchQuery) ||
+               deviceKey.includes(this.searchQuery) ||
                server.includes(this.searchQuery) ||
                app.includes(this.searchQuery) ||
                whatsapp.includes(this.searchQuery);
@@ -1111,6 +1115,24 @@ const App = {
               ${client.password ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.password)}', 'Senha')" title="Copiar Senha">📋</button>` : ''}
             </div>
           </div>
+
+          ${client.mac ? `
+          <div class="credential-item">
+            <span class="cred-label">MAC:</span>
+            <div class="cred-value-wrap">
+              <span class="cred-val" style="color: #fbbf24; font-weight: 600; font-family: monospace;">${this.escapeHtml(client.mac)}</span>
+              <button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.mac)}', 'MAC')" title="Copiar MAC">📋</button>
+            </div>
+          </div>` : ''}
+
+          ${(client.deviceKey || client.key) ? `
+          <div class="credential-item">
+            <span class="cred-label">Chave / Key:</span>
+            <div class="cred-value-wrap">
+              <span class="cred-val" style="color: #34d399; font-weight: 600;">${this.escapeHtml(client.deviceKey || client.key)}</span>
+              <button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.deviceKey || client.key)}', 'Chave')" title="Copiar Chave">📋</button>
+            </div>
+          </div>` : ''}
 
           <div class="credential-item">
             <span class="cred-label">WhatsApp:</span>
@@ -1233,6 +1255,10 @@ const App = {
       document.getElementById('clientPrice').value = client.price || '';
       document.getElementById('clientUsername').value = client.username || '';
       document.getElementById('clientPassword').value = client.password || '';
+      const macInput = document.getElementById('clientMac');
+      const keyInput = document.getElementById('clientKey');
+      if (macInput) macInput.value = client.mac || '';
+      if (keyInput) keyInput.value = client.deviceKey || client.key || '';
       document.getElementById('clientServer').value = client.server || '';
       document.getElementById('clientWhatsapp').value = client.whatsapp || '';
       document.getElementById('clientNotes').value = client.notes || '';
@@ -1241,6 +1267,11 @@ const App = {
       title.textContent = 'Novo Cliente IPTV';
       document.getElementById('clientId').value = '';
       
+      const macInput = document.getElementById('clientMac');
+      const keyInput = document.getElementById('clientKey');
+      if (macInput) macInput.value = '';
+      if (keyInput) keyInput.value = '';
+
       // Sugerir URL padrão das configurações
       if (settings.defaultUrl) {
         document.getElementById('clientUrl').value = settings.defaultUrl;
@@ -1278,6 +1309,8 @@ const App = {
     const price = parseFloat(document.getElementById('clientPrice').value) || 0;
     const username = document.getElementById('clientUsername').value.trim();
     const password = document.getElementById('clientPassword').value.trim();
+    const mac = document.getElementById('clientMac') ? document.getElementById('clientMac').value.trim().toUpperCase() : '';
+    const deviceKey = document.getElementById('clientKey') ? document.getElementById('clientKey').value.trim() : '';
     const server = document.getElementById('clientServer').value.trim();
     const whatsapp = document.getElementById('clientWhatsapp').value.trim();
     const notes = document.getElementById('clientNotes').value.trim();
@@ -1296,6 +1329,8 @@ const App = {
       price,
       username,
       password,
+      mac,
+      deviceKey,
       server,
       whatsapp,
       notes
@@ -1344,17 +1379,32 @@ const App = {
   // Formatar Template de mensagem substituindo variáveis
   formatTemplate(template, client, settings) {
     if (!template) return '';
-    return template
+    const mac = client.mac || '';
+    const key = client.deviceKey || client.key || '';
+
+    let text = template
       .replace(/{NOME}/g, client.name || '')
       .replace(/{APP}/g, client.app || 'IPTV')
       .replace(/{URL}/g, client.url || '')
       .replace(/{USUARIO}/g, client.username || '')
       .replace(/{SENHA}/g, client.password || '')
+      .replace(/{MAC}/g, mac)
+      .replace(/{CHAVE}/g, key)
       .replace(/{VENCIMENTO}/g, this.formatDate(client.expiration))
       .replace(/{VALOR}/g, (client.price || 0).toFixed(2).replace('.', ','))
       .replace(/{PIX}/g, settings.pixKey || '(21)964551053')
       .replace(/{TITULAR}/g, settings.pixName || 'Andrew Gibson Harris')
       .replace(/{BANCO}/g, settings.pixBank || 'Itaú');
+
+    // Se o cliente tem MAC ou Chave e a mensagem de acesso não os possui explicitamente, anexar de forma elegante
+    if (mac && !template.includes('{MAC}') && !text.includes(mac)) {
+      text += `\n🆔 *MAC:* ${mac}`;
+    }
+    if (key && !template.includes('{CHAVE}') && !text.includes(key)) {
+      text += `\n🔑 *Chave:* ${key}`;
+    }
+
+    return text;
   },
 
   // Abrir WhatsApp Web ou App

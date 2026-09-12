@@ -20,7 +20,7 @@
   <link rel="shortcut icon" href="./icons/icon-64.png?v=4">
 
   <!-- Estilos -->
-  <link rel="stylesheet" href="./style.css?v=9.0">
+  <link rel="stylesheet" href="./style.css?v=10.0">
   <style>
     /* Estilos Críticos do Menu Lateral Deslizante (Garante visual perfeito mesmo com cache antigo) */
     .drawer-overlay {
@@ -502,6 +502,18 @@
             </div>
           </div>
 
+          <!-- MAC e Chave do Dispositivo (Apps como IBO Player, SmartOne, Tivimate, etc.) -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="clientMac">Endereço MAC (Dispositivo)</label>
+              <input type="text" id="clientMac" class="form-input" placeholder="Ex: 00:1A:79:A1:B2:C3" style="text-transform: uppercase;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="clientKey">Chave / Device Key</label>
+              <input type="text" id="clientKey" class="form-input" placeholder="Ex: 123456 ou Chave OTP">
+            </div>
+          </div>
+
           <!-- Valor da Mensalidade -->
           <div class="form-group">
             <label class="form-label" for="clientPrice">Valor da Mensalidade (R$)</label>
@@ -733,7 +745,7 @@
           <div class="form-group">
             <label class="form-label" for="settingAccessMsg">Modelo de Dados de Acesso</label>
             <textarea id="settingAccessMsg" class="form-textarea" rows="4"></textarea>
-            <span style="font-size: 0.7rem; color: var(--text-dim);">Variáveis: {NOME}, {APP}, {URL}, {USUARIO}, {SENHA}, {VENCIMENTO}</span>
+            <span style="font-size: 0.7rem; color: var(--text-dim);">Variáveis: {NOME}, {APP}, {URL}, {USUARIO}, {SENHA}, {MAC}, {CHAVE}, {VENCIMENTO}</span>
           </div>
         </div>
 
@@ -927,11 +939,11 @@ service cloud.firestore {
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <!-- Scripts da Aplicação -->
-  <script src="./firebase-config.js?v=9.0"></script>
-  <script src="./auth.js?v=9.0"></script>
-  <script src="./database.js?v=9.0"></script>
-  <script src="./storage.js?v=9.0"></script>
-  <script src="./notifications.js?v=9.0"></script>
-  <script src="./app.js?v=9.0"></script>
+  <script src="./firebase-config.js?v=10.0"></script>
+  <script src="./auth.js?v=10.0"></script>
+  <script src="./database.js?v=10.0"></script>
+  <script src="./storage.js?v=10.0"></script>
+  <script src="./notifications.js?v=10.0"></script>
+  <script src="./app.js?v=10.0"></script>
 </body>
 </html>
