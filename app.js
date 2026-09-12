@@ -553,6 +553,16 @@ const App = {
             <span>🗑️ Excluir Outras Contas</span>
           </button>
         </div>
+        <!-- Liberação rápida por e-mail -->
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 10px; margin-bottom: 12px;">
+          <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 6px;">⚡ Liberação Direta por E-mail (Aprovação Imediata):</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="email" id="quickApproveEmail" placeholder="Digite o e-mail do usuário..." class="form-input" style="padding: 6px 10px; font-size: 0.8rem; flex: 1;">
+            <button type="button" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.75rem;" onclick="App.handleQuickApprove()">
+              <span>⚡ Liberar</span>
+            </button>
+          </div>
+        </div>
       `;
 
       if (accounts.length === 0) {
@@ -587,18 +597,19 @@ const App = {
                 </span>
               ` : `
                 ${status !== 'approved' ? `
-                  <button class="btn-acc-action btn-acc-approve" onclick="App.handleApproveAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}')">
+                  <button class="btn-acc-action btn-acc-approve" onclick="App.handleApproveAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}', '${this.escapeJs(acc.email)}')">
                     <span>✅ Aprovar</span>
                   </button>
-                ` : ''}
-
-                ${status === 'approved' ? `
-                  <button class="btn-acc-action btn-acc-block" onclick="App.handleBlockAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}')">
+                ` : `
+                  <button class="btn-acc-action btn-acc-approve" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.35); color: #34d399;" title="Forçar re-sincronização na nuvem" onclick="App.handleApproveAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}', '${this.escapeJs(acc.email)}')">
+                    <span>🔄 Re-aprovar</span>
+                  </button>
+                  <button class="btn-acc-action btn-acc-block" onclick="App.handleBlockAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}', '${this.escapeJs(acc.email)}')">
                     <span>🚫 Bloquear</span>
                   </button>
-                ` : ''}
+                `}
 
-                <button class="btn-acc-action btn-acc-delete" onclick="App.handleDeleteAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}')">
+                <button class="btn-acc-action btn-acc-delete" onclick="App.handleDeleteAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}', '${this.escapeJs(acc.email)}')">
                   <span>🗑️</span>
                 </button>
               `}
@@ -614,25 +625,61 @@ const App = {
   },
 
   // Ações de Aprovação / Bloqueio pelo Admin
-  async handleApproveAccount(uid, name) {
-    await AuthManager.updateAccountStatus(uid, 'approved');
-    this.showToast(`Conta de "${name}" aprovada com sucesso!`, 'success');
-    this.renderAccountsList();
-  },
-
-  async handleBlockAccount(uid, name) {
-    if (confirm(`Deseja realmente bloquear o acesso de "${name}"?`)) {
-      await AuthManager.updateAccountStatus(uid, 'blocked');
-      this.showToast(`Conta de "${name}" foi bloqueada.`, 'info');
-      this.renderAccountsList();
+  async handleApproveAccount(uid, name, email) {
+    try {
+      this.showToast(`Liberando conta de "${name}"...`, 'info');
+      await AuthManager.updateAccountStatus(uid, 'approved', email);
+      this.showToast(`✅ Conta de "${name}" aprovada e liberada com sucesso!`, 'success');
+      await this.renderAccountsList();
+    } catch (err) {
+      alert('Aviso: ' + (err.message || err));
+      await this.renderAccountsList();
     }
   },
 
-  async handleDeleteAccount(uid, name) {
+  async handleBlockAccount(uid, name, email) {
+    if (confirm(`Deseja realmente bloquear o acesso de "${name}"?`)) {
+      try {
+        await AuthManager.updateAccountStatus(uid, 'blocked', email);
+        this.showToast(`Conta de "${name}" foi bloqueada.`, 'info');
+        await this.renderAccountsList();
+      } catch (err) {
+        alert('Aviso: ' + (err.message || err));
+        await this.renderAccountsList();
+      }
+    }
+  },
+
+  async handleDeleteAccount(uid, name, email) {
     if (confirm(`Tem certeza que deseja excluir a conta de "${name}"?`)) {
-      await AuthManager.deleteAccount(uid);
-      this.showToast(`Conta de "${name}" excluída.`, 'info');
-      this.renderAccountsList();
+      try {
+        await AuthManager.deleteAccount(uid, email);
+        this.showToast(`Conta de "${name}" excluída.`, 'info');
+        await this.renderAccountsList();
+      } catch (err) {
+        alert('Aviso: ' + (err.message || err));
+        await this.renderAccountsList();
+      }
+    }
+  },
+
+  async handleQuickApprove() {
+    const input = document.getElementById('quickApproveEmail');
+    if (!input) return;
+    const email = input.value.trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      alert('Digite um e-mail válido para liberar.');
+      return;
+    }
+    try {
+      this.showToast(`Liberando acesso para ${email}...`, 'info');
+      await AuthManager.updateAccountStatus(null, 'approved', email);
+      this.showToast(`✅ Acesso de ${email} liberado com sucesso!`, 'success');
+      input.value = '';
+      await this.renderAccountsList();
+    } catch (err) {
+      alert('Aviso: ' + (err.message || err));
+      await this.renderAccountsList();
     }
   },
 

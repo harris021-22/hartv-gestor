@@ -61,8 +61,8 @@ const AuthManager = {
             let role = isMaster ? 'admin' : 'user';
 
             if (!isMaster) {
-              const accountDoc = await this.getCloudAccountDoc(user.uid);
-              status = accountDoc && accountDoc.status ? accountDoc.status : 'pending';
+              const check = await this.checkUserApprovalStatus(user.uid, user.email);
+              status = check.status;
               role = 'user'; // Jamais permitir admin para terceiros
 
               // Se não estiver aprovado, desconectar imediatamente!
@@ -129,6 +129,80 @@ const AuthManager = {
     });
   },
 
+  // VERIFICAÇÃO MULTI-CAMADA DE APROVAÇÃO (UID, EMAIL E LOCAL)
+  async checkUserApprovalStatus(uid, email) {
+    const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+    if (this.isMasterEmail(cleanEmail)) {
+      return { status: 'approved', role: 'admin' };
+    }
+
+    let foundStatus = null;
+
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      const db = firebase.firestore();
+
+      // 1. Tentar por UID no Firestore
+      if (uid && uid !== 'undefined' && uid !== 'null') {
+        try {
+          const docSnap = await db.collection('system_accounts').doc(String(uid)).get();
+          if (docSnap.exists) {
+            const data = docSnap.data();
+            if (data && data.status) {
+              foundStatus = data.status;
+            }
+          }
+        } catch (e) {
+          console.warn('[Auth] Erro ao buscar aprovação por UID:', e);
+        }
+      }
+
+      // 2. Tentar por Email como ID do documento
+      if ((!foundStatus || foundStatus === 'pending') && cleanEmail) {
+        try {
+          const docSnap = await db.collection('system_accounts').doc(cleanEmail).get();
+          if (docSnap.exists) {
+            const data = docSnap.data();
+            if (data && data.status) {
+              foundStatus = data.status;
+            }
+          }
+        } catch (e) {
+          console.warn('[Auth] Erro ao buscar aprovação por email-doc:', e);
+        }
+      }
+
+      // 3. Tentar por query onde email == cleanEmail
+      if ((!foundStatus || foundStatus === 'pending') && cleanEmail) {
+        try {
+          const qSnap = await db.collection('system_accounts').where('email', '==', cleanEmail).get();
+          qSnap.forEach(d => {
+            const data = d.data();
+            if (data && data.status === 'approved') {
+              foundStatus = 'approved';
+            } else if (!foundStatus && data && data.status) {
+              foundStatus = data.status;
+            }
+          });
+        } catch (e) {
+          console.warn('[Auth] Erro ao buscar aprovação por query email:', e);
+        }
+      }
+    }
+
+    // 4. Fallback no LocalStorage
+    if ((!foundStatus || foundStatus === 'pending') && cleanEmail) {
+      const localAcc = this.getLocalAccounts().find(a => (a.email && a.email.toLowerCase() === cleanEmail) || (uid && a.uid === uid));
+      if (localAcc && localAcc.status) {
+        foundStatus = localAcc.status;
+      }
+    }
+
+    return {
+      status: foundStatus || 'pending',
+      role: 'user'
+    };
+  },
+
   // CADASTRO DE CONTAS (SOLICITAÇÃO DE ACESSO COM APROVAÇÃO MANUAL)
   async register(displayName, email, password) {
     const cleanEmail = String(email || '').trim().toLowerCase();
@@ -165,7 +239,9 @@ const AuthManager = {
           };
 
           try {
+            // Salvar por UID e também por e-mail para redundância garantida
             await firebase.firestore().collection('system_accounts').doc(cred.user.uid).set(accountData, { merge: true });
+            await firebase.firestore().collection('system_accounts').doc(cleanEmail).set(accountData, { merge: true });
           } catch (e) {
             console.warn('Erro ao salvar em system_accounts:', e);
           }
@@ -262,9 +338,9 @@ const AuthManager = {
           let role = isMaster ? 'admin' : 'user';
 
           if (!isMaster) {
-            // Checar documento no Firestore
-            const accountDoc = await this.getCloudAccountDoc(cred.user.uid);
-            status = accountDoc && accountDoc.status ? accountDoc.status : 'pending';
+            // Checagem multi-camada de status de aprovação
+            const check = await this.checkUserApprovalStatus(cred.user.uid, cleanEmail);
+            status = check.status;
             role = 'user'; // Jamais admin
 
             if (status !== 'approved') {
@@ -276,6 +352,18 @@ const AuthManager = {
               }
               throw new Error('⏳ Sua solicitação ainda não foi aprovada pelo administrador (andrew.g.h.agh@gmail.com). Aguarde a liberação.');
             }
+
+            // Se aprovado, sincronizar Firestore doc por UID para acessos ultra-rápidos
+            try {
+              await firebase.firestore().collection('system_accounts').doc(cred.user.uid).set({
+                uid: cred.user.uid,
+                email: cleanEmail,
+                displayName: cred.user.displayName || cleanEmail.split('@')[0],
+                status: 'approved',
+                role: 'user',
+                lastLoginAt: new Date().toISOString()
+              }, { merge: true });
+            } catch (e) {}
           }
 
           this.currentUser = {
@@ -379,7 +467,14 @@ const AuthManager = {
       try {
         const snap = await firebase.firestore().collection('system_accounts').get();
         snap.forEach(doc => {
-          if (doc.exists) cloudList.push(doc.data());
+          if (doc.exists) {
+            const data = doc.data() || {};
+            cloudList.push({
+              uid: data.uid || doc.id,
+              docId: doc.id,
+              ...data
+            });
+          }
         });
       } catch (e) {
         console.warn('Erro ao listar system_accounts no Firestore:', e);
@@ -395,8 +490,21 @@ const AuthManager = {
     });
     cloudList.forEach(acc => {
       if (acc && acc.email) {
-        const existing = map.get(acc.email.toLowerCase());
-        map.set(acc.email.toLowerCase(), { ...(existing || {}), ...acc });
+        const key = acc.email.toLowerCase();
+        const existing = map.get(key);
+        let mergedStatus = acc.status || (existing && existing.status) || 'pending';
+        // Se uma das fontes indicar aprovado, prevalece o status aprovado
+        if ((existing && existing.status === 'approved') || acc.status === 'approved') {
+          mergedStatus = 'approved';
+        } else if ((existing && existing.status === 'blocked') || acc.status === 'blocked') {
+          mergedStatus = 'blocked';
+        }
+
+        map.set(key, {
+          ...(existing || {}),
+          ...acc,
+          status: mergedStatus
+        });
       }
     });
 
@@ -444,40 +552,126 @@ const AuthManager = {
   },
 
   // APROVAR OU BLOQUEAR CONTA
-  async updateAccountStatus(uid, newStatus) {
-    if (!uid || !newStatus) return false;
+  async updateAccountStatus(uid, newStatus, email) {
+    if (!newStatus) return false;
+    const cleanEmail = email ? String(email).trim().toLowerCase() : (uid && String(uid).includes('@') ? String(uid).trim().toLowerCase() : null);
 
-    // Atualizar no Firestore
+    let firestoreError = null;
+
+    // 1. Atualizar no Firestore com tripla redundância (doc UID, doc Email e query where email)
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      const db = firebase.firestore();
       try {
-        await firebase.firestore().collection('system_accounts').doc(uid).update({ status: newStatus });
-      } catch (e) {
-        console.warn('Erro ao atualizar status no Firestore:', e);
+        const batch = db.batch();
+        let ops = 0;
+
+        // A) Atualizar por UID com set({ merge: true })
+        if (uid && uid !== 'undefined' && uid !== 'null') {
+          const docRef = db.collection('system_accounts').doc(String(uid));
+          batch.set(docRef, { status: newStatus, email: cleanEmail || '', updatedAt: new Date().toISOString() }, { merge: true });
+          ops++;
+        }
+
+        // B) Atualizar por Email como doc ID com set({ merge: true })
+        if (cleanEmail) {
+          const docRefEmail = db.collection('system_accounts').doc(cleanEmail);
+          batch.set(docRefEmail, { status: newStatus, email: cleanEmail, updatedAt: new Date().toISOString() }, { merge: true });
+          ops++;
+        }
+
+        // C) Atualizar todos os documentos onde email == cleanEmail
+        if (cleanEmail) {
+          try {
+            const snap = await db.collection('system_accounts').where('email', '==', cleanEmail).get();
+            snap.forEach(docSnap => {
+              batch.set(docSnap.ref, { status: newStatus, updatedAt: new Date().toISOString() }, { merge: true });
+              ops++;
+            });
+          } catch (e) {
+            console.warn('[Auth] Erro ao buscar por email no Firestore:', e);
+          }
+        }
+
+        if (ops > 0) {
+          await batch.commit();
+          console.log(`[Auth] Status "${newStatus}" sincronizado no Firestore para uid=${uid}, email=${cleanEmail}`);
+        }
+      } catch (err) {
+        console.error('[Auth] Erro no batch Firestore:', err);
+        firestoreError = err;
+
+        // Fallback individual direto se batch falhar
+        try {
+          if (uid && uid !== 'undefined' && uid !== 'null') {
+            await db.collection('system_accounts').doc(String(uid)).set({ status: newStatus }, { merge: true });
+          }
+          if (cleanEmail) {
+            await db.collection('system_accounts').doc(cleanEmail).set({ status: newStatus, email: cleanEmail }, { merge: true });
+          }
+          firestoreError = null;
+        } catch (fbErr) {
+          firestoreError = fbErr;
+        }
       }
     }
 
-    // Atualizar localmente
+    // 2. Atualizar localmente
     const accounts = this.getLocalAccounts();
-    const idx = accounts.findIndex(a => a.uid === uid || a.email === uid);
-    if (idx !== -1) {
-      accounts[idx].status = newStatus;
-      this.saveLocalAccounts(accounts);
+    let updated = false;
+    accounts.forEach(a => {
+      const matchUid = uid && a.uid && String(a.uid) === String(uid);
+      const matchEmail = cleanEmail && a.email && a.email.toLowerCase() === cleanEmail;
+      if (matchUid || matchEmail) {
+        a.status = newStatus;
+        updated = true;
+      }
+    });
+
+    if (!updated && cleanEmail) {
+      accounts.push({
+        uid: uid || 'usr_' + Date.now(),
+        email: cleanEmail,
+        status: newStatus,
+        role: 'user',
+        createdAt: new Date().toISOString()
+      });
     }
+    this.saveLocalAccounts(accounts);
+
+    if (firestoreError) {
+      throw new Error(`Status gravado localmente, mas a sincronização na nuvem (Firestore) falhou: ${firestoreError.message}`);
+    }
+
     return true;
   },
 
   // EXCLUIR UMA CONTA ESPECÍFICA
-  async deleteAccount(uid) {
-    if (!uid) return false;
+  async deleteAccount(uid, email) {
+    if (!uid && !email) return false;
+    const cleanEmail = email ? String(email).trim().toLowerCase() : (uid && String(uid).includes('@') ? String(uid).trim().toLowerCase() : null);
 
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      const db = firebase.firestore();
       try {
-        await firebase.firestore().collection('system_accounts').doc(uid).delete();
-      } catch (e) {}
+        if (uid && uid !== 'undefined' && uid !== 'null') {
+          await db.collection('system_accounts').doc(String(uid)).delete().catch(() => {});
+        }
+        if (cleanEmail) {
+          await db.collection('system_accounts').doc(cleanEmail).delete().catch(() => {});
+          const qSnap = await db.collection('system_accounts').where('email', '==', cleanEmail).get();
+          qSnap.forEach(d => d.ref.delete().catch(() => {}));
+        }
+      } catch (e) {
+        console.warn('Erro ao deletar no Firestore:', e);
+      }
     }
 
     const accounts = this.getLocalAccounts();
-    const filtered = accounts.filter(a => a.uid !== uid && a.email !== uid);
+    const filtered = accounts.filter(a => {
+      if (uid && a.uid && String(a.uid) === String(uid)) return false;
+      if (cleanEmail && a.email && a.email.toLowerCase() === cleanEmail) return false;
+      return true;
+    });
     this.saveLocalAccounts(filtered);
     return true;
   },
