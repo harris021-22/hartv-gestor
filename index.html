@@ -324,10 +324,10 @@
       </div>
 
       <div class="drawer-body">
-        <!-- Item: Aprovações de Contas (Apenas Admin) -->
+        <!-- Item: Gerenciar Usuários (Apenas Admin) -->
         <button id="drawerItemApprovals" class="drawer-item admin-item" style="display: none;">
           <span class="drawer-item-icon">👥</span>
-          <span class="drawer-item-label">Aprovações de Contas</span>
+          <span class="drawer-item-label">Gerenciar Usuários</span>
           <span id="drawerPendingCount" class="drawer-counter-badge" style="display: none;">0</span>
         </button>
 
@@ -763,33 +763,7 @@
     </div>
   </div>
 
-  <!-- SCRIPT INLINE PARA GARANTIR ALTERNÂNCIA DE ABAS DE LOGIN/CADASTRO -->
-  <script>
-    function switchAuthTab(tab) {
-      var tabLogin = document.getElementById('tabLoginBtn');
-      var tabReg = document.getElementById('tabRegisterBtn');
-      var formLogin = document.getElementById('formLogin');
-      var formReg = document.getElementById('formRegister');
-      if (tab === 'register') {
-        if (tabReg) tabReg.className = 'auth-tab active';
-        if (tabLogin) tabLogin.className = 'auth-tab';
-        if (formReg) formReg.style.display = 'flex';
-        if (formLogin) formLogin.style.display = 'none';
-        var regName = document.getElementById('regName');
-        if (regName) regName.focus();
-      } else {
-        if (tabLogin) tabLogin.className = 'auth-tab active';
-        if (tabReg) tabReg.className = 'auth-tab';
-        if (formLogin) formLogin.style.display = 'flex';
-        if (formReg) formReg.style.display = 'none';
-        var loginEmail = document.getElementById('loginEmail');
-        if (loginEmail) loginEmail.focus();
-      }
-    }
-    window.switchAuthTab = switchAuthTab;
-  </script>
-
-  <!-- TELA DE AUTENTICAÇÃO (LOGIN / CADASTRO) -->
+  <!-- TELA DE AUTENTICAÇÃO (LOGIN DIRETO) -->
   <div id="authScreen" class="auth-overlay" style="display: none;">
     <div class="auth-card">
       <div class="auth-brand">
@@ -797,20 +771,14 @@
           <img src="./icons/logo.png?v=3" alt="HarTv Gestor" style="width: 100%; height: 100%; object-fit: contain; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);">
         </div>
         <h1 class="brand-title" style="font-size: 1.45rem; text-align: center;">HarTv Gestor</h1>
-        <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 4px;">Acesso seguro e isolado ao painel</p>
-      </div>
-
-      <!-- Abas Entrar / Criar Conta -->
-      <div class="auth-tabs">
-        <button type="button" id="tabLoginBtn" class="auth-tab active" onclick="switchAuthTab('login')">Entrar</button>
-        <button type="button" id="tabRegisterBtn" class="auth-tab" onclick="switchAuthTab('register')">Criar Conta</button>
+        <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 4px;">Acesso exclusivo ao painel</p>
       </div>
 
       <!-- Form Login -->
       <form id="formLogin" class="auth-form" onsubmit="App.handleLoginSubmit(event)">
         <div class="form-group">
-          <label class="form-label" for="loginEmail">E-mail ou Usuário</label>
-          <input type="email" id="loginEmail" class="form-input" placeholder="seuemail@exemplo.com" required autocomplete="email">
+          <label class="form-label" for="loginEmail">Usuário ou E-mail</label>
+          <input type="text" id="loginEmail" class="form-input" placeholder="Digite seu usuário ou e-mail" required autocomplete="username">
         </div>
         <div class="form-group">
           <label class="form-label" for="loginPassword">Senha</label>
@@ -824,27 +792,8 @@
         </button>
       </form>
 
-      <!-- Form Cadastro -->
-      <form id="formRegister" class="auth-form" style="display: none;" onsubmit="App.handleRegisterSubmit(event)">
-        <div class="form-group">
-          <label class="form-label" for="regName">Seu Nome Completo</label>
-          <input type="text" id="regName" class="form-input" placeholder="Ex: Carlos Silva" required autocomplete="name">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="regEmail">E-mail</label>
-          <input type="email" id="regEmail" class="form-input" placeholder="seuemail@exemplo.com" required autocomplete="email">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="regPassword">Criar Senha (mínimo 6 dígitos)</label>
-          <input type="password" id="regPassword" class="form-input" placeholder="Mínimo 6 caracteres" minlength="6" required autocomplete="new-password">
-        </div>
-        <button type="submit" id="btnRegisterSubmit" class="btn btn-success" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
-          <span>✨ Criar Conta (Solicitar Acesso)</span>
-        </button>
-      </form>
-
       <div class="auth-security-badge">
-        🔒 As novas contas solicitadas precisam de aprovação prévia para liberar o acesso.
+        🔒 Acesso seguro e exclusivo. O seu usuário e senha são fornecidos diretamente pelo Administrador.
       </div>
     </div>
   </div>
@@ -876,16 +825,51 @@
     </div>
   </div>
 
-  <!-- MODAL: Gerenciar Contas / Aprovações (Admin Master) -->
+  <!-- MODAL: Gerenciar Contas & Usuários (Admin Master) -->
   <div id="manageAccountsModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 600px;">
+    <div class="modal-content" style="max-width: 620px;">
       <div class="modal-header">
-        <h2 class="modal-title">👥 Contas &amp; Aprovações</h2>
+        <h2 class="modal-title">👥 Gerenciar Usuários &amp; Acessos</h2>
         <button class="modal-close">&times;</button>
       </div>
       <div class="modal-body">
+        <!-- Formulário para Criar Novo Usuário -->
+        <div class="admin-create-user-card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+            <span style="font-size: 0.92rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+              <span>➕ Adicionar Novo Usuário</span>
+            </span>
+            <span style="font-size: 0.7rem; color: #a7f3d0; background: rgba(16, 185, 129, 0.15); padding: 3px 8px; border-radius: 9999px; font-weight: 600;">⚡ Liberação Direta</span>
+          </div>
+          
+          <form id="formAdminCreateUser" onsubmit="App.handleAdminCreateUser(event)" style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="adminNewUserName" style="font-size: 0.74rem;">Nome ou Identificação do Usuário:</label>
+              <input type="text" id="adminNewUserName" class="form-input" placeholder="Ex: Carlos Silva ou Loja Centro" required style="padding: 8px 12px; font-size: 0.85rem;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="adminNewUserLogin" style="font-size: 0.74rem;">Usuário ou E-mail:</label>
+                <input type="text" id="adminNewUserLogin" class="form-input" placeholder="Ex: carlos123 ou carlos@gmail.com" required style="padding: 8px 12px; font-size: 0.85rem;">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="adminNewUserPassword" style="font-size: 0.74rem;">Senha (mínimo 6 dígitos):</label>
+                <div style="position: relative; display: flex; align-items: center;">
+                  <input type="text" id="adminNewUserPassword" class="form-input" placeholder="Ex: 123456" minlength="6" required style="padding: 8px 36px 8px 12px; font-size: 0.85rem; width: 100%;">
+                  <button type="button" onclick="App.generateRandomPassword()" style="position: absolute; right: 4px; background: none; border: none; font-size: 1.05rem; cursor: pointer; color: #38bdf8; padding: 4px;" title="Gerar Senha Aleatória Automática">🎲</button>
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" id="btnAdminCreateUser" class="btn btn-primary" style="padding: 10px 14px; font-size: 0.85rem; justify-content: center; margin-top: 4px; font-weight: 700;">
+              <span>✨ Criar e Liberar Usuário</span>
+            </button>
+          </form>
+        </div>
+
         <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 8px;">
-          Aqui você aprova ou bloqueia o acesso de outros usuários ao sistema:
+          Usuários cadastrados e seus acessos:
         </p>
         <div id="accountsListContainer" style="display: flex; flex-direction: column; gap: 10px;">
           <!-- Renderizado via app.js -->
@@ -894,6 +878,66 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary modal-cancel">Fechar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Dados de Acesso do Usuário Criado (Envio Rápido) -->
+  <div id="userCreatedModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 480px; border: 1px solid rgba(16, 185, 129, 0.4);">
+      <div class="modal-header" style="background: rgba(16, 185, 129, 0.1);">
+        <h2 class="modal-title" style="color: #34d399;">🎉 Usuário Criado com Sucesso!</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 12px;">
+        <p style="color: var(--text-muted);">
+          A conta já foi liberada e está pronta para uso imediato! Envie os dados abaixo para o novo usuário:
+        </p>
+        <div style="background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 14px; font-family: monospace; font-size: 0.85rem; line-height: 1.6; color: #e2e8f0; white-space: pre-line;" id="userCreatedSummaryBox">
+          <!-- Preenchido via App.js -->
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button type="button" class="btn btn-secondary" onclick="App.handleCopyCreatedUser()">
+          <span>📋 Copiar Dados</span>
+        </button>
+        <button type="button" class="btn btn-success" onclick="App.handleSendCreatedUserWhatsApp()" style="background: #10b981; border-color: #059669;">
+          <span>📲 Enviar no WhatsApp</span>
+        </button>
+        <button type="button" class="btn btn-secondary modal-cancel">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Alterar Senha de Usuário -->
+  <div id="changePasswordModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-header">
+        <h2 class="modal-title">🔑 Alterar Senha do Usuário</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="formChangePassword" onsubmit="App.handleSaveNewPassword(event)">
+        <input type="hidden" id="changePassUid">
+        <input type="hidden" id="changePassEmail">
+        <input type="hidden" id="changePassOldPass">
+        <div class="modal-body">
+          <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 12px;">
+            Definir nova senha para: <strong id="changePassUserName" style="color: #ffffff;">...</strong>
+          </p>
+          <div class="form-group">
+            <label class="form-label" for="changePassNewInput">Nova Senha (mínimo 6 dígitos)</label>
+            <div style="position: relative; display: flex; align-items: center;">
+              <input type="text" id="changePassNewInput" class="form-input" placeholder="Digite a nova senha" minlength="6" required style="padding: 8px 36px 8px 12px; width: 100%;">
+              <button type="button" onclick="App.generateRandomPasswordForChange()" style="position: absolute; right: 4px; background: none; border: none; font-size: 1.05rem; cursor: pointer; color: #38bdf8; padding: 4px;" title="Gerar Senha Aleatória">🎲</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary modal-cancel">Cancelar</button>
+          <button type="submit" id="btnSaveNewPass" class="btn btn-primary">
+            <span>💾 Salvar Nova Senha</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 

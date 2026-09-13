@@ -341,23 +341,10 @@ const App = {
       });
     });
 
-    // Eventos de Autenticação (Login / Cadastro / Logout)
-    const tabLoginBtn = document.getElementById('tabLoginBtn');
-    const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+    // Eventos de Autenticação (Login / Logout)
     const formLogin = document.getElementById('formLogin');
-    const formRegister = document.getElementById('formRegister');
-
-    if (tabLoginBtn) {
-      tabLoginBtn.onclick = () => this.switchAuthTab('login');
-    }
-    if (tabRegisterBtn) {
-      tabRegisterBtn.onclick = () => this.switchAuthTab('register');
-    }
     if (formLogin) {
       formLogin.onsubmit = (e) => this.handleLoginSubmit(e);
-    }
-    if (formRegister) {
-      formRegister.onsubmit = (e) => this.handleRegisterSubmit(e);
     }
 
     const btnLogout = document.getElementById('btnLogout');
@@ -617,12 +604,188 @@ const App = {
     }
   },
 
-  // Renderizar Lista de Contas para Aprovação
+  lastCreatedUserData: null,
+
+  // Gerar senha aleatória de 6 dígitos numéricos (ideal para TV boxes e celulares)
+  generateRandomPassword() {
+    const pass = Math.floor(100000 + Math.random() * 900000);
+    const input = document.getElementById('adminNewUserPassword');
+    if (input) input.value = pass;
+  },
+
+  generateRandomPasswordForChange() {
+    const pass = Math.floor(100000 + Math.random() * 900000);
+    const input = document.getElementById('changePassNewInput');
+    if (input) input.value = pass;
+  },
+
+  // Criar novo usuário pelo painel do Admin Master
+  async handleAdminCreateUser(e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const nameInput = document.getElementById('adminNewUserName');
+    const loginInput = document.getElementById('adminNewUserLogin');
+    const passInput = document.getElementById('adminNewUserPassword');
+    const submitBtn = document.getElementById('btnAdminCreateUser');
+
+    const name = nameInput ? nameInput.value.trim() : '';
+    const login = loginInput ? loginInput.value.trim() : '';
+    const pass = passInput ? passInput.value.trim() : '';
+
+    if (!name || !login || !pass) {
+      alert('Por favor, preencha todos os campos (Nome, Usuário/E-mail e Senha).');
+      return;
+    }
+
+    if (pass.length < 6) {
+      alert('A senha deve conter no mínimo 6 dígitos.');
+      return;
+    }
+
+    const originalBtn = submitBtn ? submitBtn.innerHTML : '';
+
+    try {
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>⏳ Criando e liberando conta...</span>';
+      }
+
+      const res = await AuthManager.createUserByAdmin(name, login, pass);
+
+      const loginDisplay = res.loginDisplay || login;
+      const appUrl = window.location.origin && window.location.origin !== 'null' ? window.location.origin : 'https://hartv-gestor.web.app';
+
+      this.lastCreatedUserData = {
+        name: name,
+        login: loginDisplay,
+        password: pass,
+        url: appUrl
+      };
+
+      // Preencher caixa do modal de dados de acesso
+      const summaryBox = document.getElementById('userCreatedSummaryBox');
+      if (summaryBox) {
+        summaryBox.textContent = `👤 Usuário: ${loginDisplay}\n🔑 Senha: ${pass}\n🌐 Painel: ${appUrl}`;
+      }
+
+      // Limpar formulário de criação
+      if (nameInput) nameInput.value = '';
+      if (loginInput) loginInput.value = '';
+      if (passInput) passInput.value = '';
+
+      // Abrir modal de dados criados
+      const modal = document.getElementById('userCreatedModal');
+      if (modal) modal.classList.add('open');
+
+      this.showToast(`✅ Usuário "${loginDisplay}" criado e liberado com sucesso!`, 'success');
+      await this.renderAccountsList();
+    } catch (err) {
+      alert('Erro ao criar usuário: ' + (err.message || err));
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtn || '<span>✨ Criar e Liberar Usuário</span>';
+      }
+    }
+  },
+
+  // Copiar dados do usuário recém-criado
+  handleCopyCreatedUser() {
+    if (!this.lastCreatedUserData) return;
+    const { name, login, password, url } = this.lastCreatedUserData;
+    const text = `*Seu Acesso ao HarTv Gestor* 🚀\n👤 *Usuário:* ${login}\n🔑 *Senha:* ${password}\n🌐 *Acesse por aqui:* ${url}`;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        this.showToast('📋 Dados de acesso copiados para a área de transferência!', 'success');
+      }).catch(() => {
+        prompt('Copie os dados abaixo (Ctrl+C):', text);
+      });
+    } else {
+      prompt('Copie os dados abaixo (Ctrl+C):', text);
+    }
+  },
+
+  // Enviar dados do usuário criado direto pelo WhatsApp
+  handleSendCreatedUserWhatsApp() {
+    if (!this.lastCreatedUserData) return;
+    const { name, login, password, url } = this.lastCreatedUserData;
+    const text = `Olá ${name}! Aqui está o seu acesso oficial ao painel do HarTv Gestor: 🚀\n\n👤 *Usuário:* ${login}\n🔑 *Senha:* ${password}\n🌐 *Link de Acesso:* ${url}\n\nQualquer dúvida, estou à disposição!`;
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+  },
+
+  // Copiar credenciais de um usuário já existente na lista
+  handleCopyUserCredentials(name, login, password) {
+    const appUrl = window.location.origin && window.location.origin !== 'null' ? window.location.origin : 'https://hartv-gestor.web.app';
+    let text = `*Seu Acesso ao HarTv Gestor* 🚀\n👤 *Usuário:* ${login}\n`;
+    if (password) {
+      text += `🔑 *Senha:* ${password}\n`;
+    }
+    text += `🌐 *Acesse por aqui:* ${appUrl}`;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        this.showToast('📋 Dados de acesso copiados!', 'success');
+      }).catch(() => {
+        prompt('Copie os dados abaixo (Ctrl+C):', text);
+      });
+    } else {
+      prompt('Copie os dados abaixo (Ctrl+C):', text);
+    }
+  },
+
+  // Abrir modal de alteração de senha
+  openChangePasswordModal(uid, name, email, oldPass) {
+    const modal = document.getElementById('changePasswordModal');
+    if (!modal) return;
+    document.getElementById('changePassUid').value = uid || '';
+    document.getElementById('changePassEmail').value = email || '';
+    document.getElementById('changePassOldPass').value = oldPass || '';
+    document.getElementById('changePassUserName').textContent = `${name} (${email})`;
+    this.generateRandomPasswordForChange();
+    modal.classList.add('open');
+  },
+
+  // Salvar nova senha definida pelo Admin Master
+  async handleSaveNewPassword(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const uid = document.getElementById('changePassUid').value;
+    const email = document.getElementById('changePassEmail').value;
+    const oldPass = document.getElementById('changePassOldPass').value;
+    const newPass = document.getElementById('changePassNewInput').value.trim();
+    const submitBtn = document.getElementById('btnSaveNewPass');
+
+    if (!newPass || newPass.length < 6) {
+      alert('A nova senha deve ter no mínimo 6 dígitos.');
+      return;
+    }
+
+    try {
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>⏳ Salvando...</span>';
+      }
+      await AuthManager.changeUserPasswordByAdmin(uid, email, newPass, oldPass);
+      this.closeAllModals();
+      this.showToast('✅ Nova senha salva com sucesso!', 'success');
+      await this.renderAccountsList();
+    } catch (err) {
+      alert('Erro ao alterar senha: ' + (err.message || err));
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>💾 Salvar Nova Senha</span>';
+      }
+    }
+  },
+
+  // Renderizar Lista de Usuários no Painel Admin
   async renderAccountsList() {
     const container = document.getElementById('accountsListContainer');
     if (!container) return;
 
-    container.innerHTML = '<div style="text-align: center; color: var(--text-dim); padding: 20px;">Carregando contas...</div>';
+    container.innerHTML = '<div style="text-align: center; color: var(--text-dim); padding: 15px;">Carregando usuários...</div>';
 
     try {
       const accounts = await AuthManager.getAccountsList();
@@ -630,87 +793,66 @@ const App = {
 
       const purgeHeader = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
-          <span style="font-size: 0.78rem; color: var(--text-muted);">Total de contas: <strong>${accounts.length}</strong></span>
+          <span style="font-size: 0.78rem; color: var(--text-muted);">Total de usuários: <strong>${accounts.length}</strong></span>
           <button class="btn btn-danger" style="font-size: 0.72rem; padding: 5px 10px;" onclick="App.handlePurgeOtherAccounts()">
-            <span>🗑️ Excluir Outras Contas</span>
+            <span>🗑️ Limpar Outras Contas</span>
           </button>
-        </div>
-        <!-- Liberação rápida por e-mail -->
-        <div style="background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 10px; margin-bottom: 12px;">
-          <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 6px;">⚡ Liberação Direta por E-mail (Aprovação Imediata):</label>
-          <div style="display: flex; gap: 8px;">
-            <input type="email" id="quickApproveEmail" placeholder="Digite o e-mail do usuário..." class="form-input" style="padding: 6px 10px; font-size: 0.8rem; flex: 1;">
-            <button type="button" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.75rem;" onclick="App.handleQuickApprove()">
-              <span>⚡ Liberar</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Atalho de Regras do Firestore para sincronização na Nuvem -->
-        <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 10px; margin-bottom: 12px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-            <span style="font-size: 0.78rem; font-weight: 700; color: #fbbf24;">🔥 Regras do Firestore (Sincronização na Nuvem)</span>
-            <span style="font-size: 0.7rem; color: var(--text-muted);">hartv-gestor</span>
-          </div>
-          <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
-            Para que suas aprovações alcancem os celulares dos outros usuários sem erro de permissão, publique as regras no Firebase:
-          </p>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button type="button" class="btn btn-secondary" style="font-size: 0.72rem; padding: 6px 10px;" onclick="App.copyFirestoreRules()">
-              <span>📋 Copiar Regras</span>
-            </button>
-            <a href="https://console.firebase.google.com/project/hartv-gestor/firestore/rules" target="_blank" class="btn btn-primary" style="font-size: 0.72rem; padding: 6px 10px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-              <span>🔗 Abrir Regras no Firebase</span>
-            </a>
-          </div>
         </div>
       `;
 
       if (accounts.length === 0) {
-        container.innerHTML = purgeHeader + '<div style="text-align: center; color: var(--text-dim); padding: 20px;">Nenhuma conta encontrada.</div>';
+        container.innerHTML = purgeHeader + '<div style="text-align: center; color: var(--text-dim); padding: 20px;">Nenhum usuário cadastrado além de você.</div>';
         return;
       }
 
       container.innerHTML = purgeHeader + accounts.map(acc => {
         const isMaster = AuthManager.isMasterEmail(acc.email);
         const isCurrent = isMaster || (currentUser && currentUser.uid === acc.uid) || (currentUser && currentUser.email && currentUser.email.toLowerCase() === acc.email.toLowerCase());
-        const status = acc.status || 'pending';
-        let statusBadge = '<span class="status-pill pending">⏳ Pendente</span>';
-        if (status === 'approved') statusBadge = '<span class="status-pill approved">🟢 Aprovado</span>';
+        const status = acc.status || 'approved';
+        let statusBadge = '<span class="status-pill approved">🟢 Ativo</span>';
         if (status === 'blocked') statusBadge = '<span class="status-pill blocked">🔴 Bloqueado</span>';
+
+        const displayName = acc.displayName || 'Sem nome';
+        const loginDisplay = acc.loginDisplay || acc.username || acc.email;
+        const passDisplay = acc.plainPassword ? `<span style="font-size: 0.72rem; color: #a7f3d0; background: rgba(16, 185, 129, 0.12); padding: 2px 6px; border-radius: 4px; font-family: monospace;">🔑 ${this.escapeHtml(acc.plainPassword)}</span>` : '';
 
         return `
           <div class="account-item-card">
             <div class="account-info">
               <div class="account-name-row">
-                <span class="account-name">${this.escapeHtml(acc.displayName || 'Sem nome')}</span>
+                <span class="account-name">${this.escapeHtml(displayName)}</span>
                 ${isMaster ? '<span style="font-size: 0.65rem; background: rgba(139, 92, 246, 0.2); color: #c084fc; padding: 2px 6px; border-radius: 4px; font-weight: 700;">ADMIN MASTER 👑</span>' : ''}
                 ${isCurrent ? '<span style="font-size: 0.65rem; color: #38bdf8;">(Você)</span>' : ''}
               </div>
-              <span class="account-email">${this.escapeHtml(acc.email)}</span>
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px;">
+                <span class="account-email">${this.escapeHtml(loginDisplay)}</span>
+                ${passDisplay}
+              </div>
               <div style="margin-top: 4px;">${statusBadge}</div>
             </div>
 
-            <div class="account-actions-group">
+            <div class="account-actions-group" style="flex-wrap: wrap;">
               ${isMaster ? `
                 <span style="font-size: 0.72rem; color: #c084fc; font-weight: 700; background: rgba(139, 92, 246, 0.15); padding: 5px 12px; border-radius: 9999px; border: 1px solid rgba(139, 92, 246, 0.35);">
-                  👑 Conta Principal
+                  👑 Conta Master
                 </span>
               ` : `
-                ${status !== 'approved' ? `
-                  <button class="btn-acc-action btn-acc-approve" onclick="App.handleApproveAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}', '${this.escapeJs(acc.email)}')">
-                    <span>✅ Aprovar</span>
+                <button class="btn-acc-action btn-acc-approve" title="Copiar Usuário e Senha para enviar ao cliente" onclick="App.handleCopyUserCredentials('${this.escapeJs(displayName)}', '${this.escapeJs(loginDisplay)}', '${this.escapeJs(acc.plainPassword || '')}')">
+                  <span>📋 Copiar</span>
+                </button>
+                <button class="btn-acc-action btn-secondary" title="Alterar Senha" onclick="App.openChangePasswordModal('${acc.uid}', '${this.escapeJs(displayName)}', '${this.escapeJs(acc.email)}', '${this.escapeJs(acc.plainPassword || '')}')" style="padding: 6px 8px; font-size: 0.72rem;">
+                  <span>🔑 Senha</span>
+                </button>
+                ${status === 'blocked' ? `
+                  <button class="btn-acc-action btn-acc-approve" title="Desbloquear acesso" onclick="App.handleApproveAccount('${acc.uid}', '${this.escapeJs(displayName)}', '${this.escapeJs(acc.email)}')">
+                    <span>🟢 Liberar</span>
                   </button>
                 ` : `
-                  <button class="btn-acc-action btn-acc-approve" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.35); color: #34d399;" title="Forçar re-sincronização na nuvem" onclick="App.handleApproveAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}', '${this.escapeJs(acc.email)}')">
-                    <span>🔄 Re-aprovar</span>
-                  </button>
-                  <button class="btn-acc-action btn-acc-block" onclick="App.handleBlockAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}', '${this.escapeJs(acc.email)}')">
+                  <button class="btn-acc-action btn-acc-block" title="Bloquear acesso temporariamente" onclick="App.handleBlockAccount('${acc.uid}', '${this.escapeJs(displayName)}', '${this.escapeJs(acc.email)}')">
                     <span>🚫 Bloquear</span>
                   </button>
                 `}
-
-                <button class="btn-acc-action btn-acc-delete" onclick="App.handleDeleteAccount('${acc.uid}', '${this.escapeJs(acc.displayName || acc.email)}', '${this.escapeJs(acc.email)}')">
+                <button class="btn-acc-action btn-acc-delete" title="Excluir Usuário" onclick="App.handleDeleteAccount('${acc.uid}', '${this.escapeJs(displayName)}', '${this.escapeJs(acc.email)}')">
                   <span>🗑️</span>
                 </button>
               `}
@@ -721,7 +863,7 @@ const App = {
 
       this.checkPendingAccounts();
     } catch (e) {
-      container.innerHTML = `<div style="color: var(--danger); padding: 10px;">Erro ao carregar contas: ${e.message}</div>`;
+      container.innerHTML = `<div style="color: var(--danger); padding: 10px;">Erro ao carregar usuários: ${e.message}</div>`;
     }
   },
 
@@ -739,17 +881,12 @@ const App = {
     }
   },
 
-  // Ações de Aprovação / Bloqueio pelo Admin
+  // Liberar/Desbloquear usuário
   async handleApproveAccount(uid, name, email) {
     try {
-      this.showToast(`Liberando conta de "${name}"...`, 'info');
-      const res = await AuthManager.updateAccountStatus(uid, 'approved', email);
-      if (res && !res.cloudSynced) {
-        this.showToast(`⚠️ Conta de "${name}" aprovada localmente! (Pendente de regras no Firebase)`, 'warning');
-        this.showFirestoreRulesModal();
-      } else {
-        this.showToast(`✅ Conta de "${name}" aprovada e liberada com sucesso!`, 'success');
-      }
+      this.showToast(`Liberando acesso de "${name}"...`, 'info');
+      await AuthManager.updateAccountStatus(uid, 'approved', email);
+      this.showToast(`✅ Acesso de "${name}" liberado com sucesso!`, 'success');
       await this.renderAccountsList();
     } catch (err) {
       alert('Aviso: ' + (err.message || err));
@@ -757,8 +894,9 @@ const App = {
     }
   },
 
+  // Bloquear usuário
   async handleBlockAccount(uid, name, email) {
-    if (confirm(`Deseja realmente bloquear o acesso de "${name}"?`)) {
+    if (confirm(`Deseja realmente bloquear o acesso de "${name}"? O usuário não conseguirá entrar.`)) {
       try {
         await AuthManager.updateAccountStatus(uid, 'blocked', email);
         this.showToast(`Conta de "${name}" foi bloqueada.`, 'info');
@@ -770,11 +908,12 @@ const App = {
     }
   },
 
+  // Excluir conta
   async handleDeleteAccount(uid, name, email) {
-    if (confirm(`Tem certeza que deseja excluir a conta de "${name}"?`)) {
+    if (confirm(`Tem certeza que deseja excluir o usuário "${name}"?`)) {
       try {
         await AuthManager.deleteAccount(uid, email);
-        this.showToast(`Conta de "${name}" excluída.`, 'info');
+        this.showToast(`Usuário "${name}" excluído.`, 'info');
         await this.renderAccountsList();
       } catch (err) {
         alert('Aviso: ' + (err.message || err));
@@ -783,85 +922,26 @@ const App = {
     }
   },
 
-  async handleQuickApprove() {
-    const input = document.getElementById('quickApproveEmail');
-    if (!input) return;
-    const email = input.value.trim().toLowerCase();
-    if (!email || !email.includes('@')) {
-      alert('Digite um e-mail válido para liberar.');
-      return;
-    }
-    try {
-      this.showToast(`Liberando acesso para ${email}...`, 'info');
-      const res = await AuthManager.updateAccountStatus(null, 'approved', email);
-      if (res && !res.cloudSynced) {
-        this.showToast(`⚠️ Acesso de ${email} liberado localmente! (Pendente de regras no Firebase)`, 'warning');
-        this.showFirestoreRulesModal();
-      } else {
-        this.showToast(`✅ Acesso de ${email} liberado com sucesso!`, 'success');
-      }
-      input.value = '';
-      await this.renderAccountsList();
-    } catch (err) {
-      alert('Aviso: ' + (err.message || err));
-      await this.renderAccountsList();
-    }
-  },
-
-  // Modal com instruções para publicação das regras no Firebase
-  showFirestoreRulesModal() {
-    const modal = document.getElementById('firestoreRulesModal');
-    if (modal) {
-      modal.classList.add('open');
-    } else {
-      alert('⚠️ ATENÇÃO: Falta publicar as regras no Firebase Console!\n\nA conta foi liberada no seu aparelho, mas para que o celular dos outros usuários também receba a liberação via nuvem, você precisa publicar as regras no Console do Firebase (leva 30 segundos).\n\nClique no botão "📋 Copiar Regras" e depois em "🔗 Abrir Regras no Firebase" na tela de Gerenciar Acessos.');
-    }
-  },
-
   // Excluir todas as outras contas exceto o Master
   async handlePurgeOtherAccounts() {
-    if (confirm('Atenção: Deseja realmente excluir todas as outras contas e deixar APENAS andrew.g.h.agh@gmail.com?')) {
+    if (confirm('Atenção: Deseja realmente excluir todos os outros usuários e deixar APENAS andrew.g.h.agh@gmail.com?')) {
       await AuthManager.purgeNonMasterAccounts();
-      this.showToast('Todas as outras contas foram excluídas!', 'success');
+      this.showToast('Outras contas excluídas!', 'success');
       this.renderAccountsList();
     }
   },
 
-  // Alternar entre abas Entrar e Criar Conta
-  switchAuthTab(tab) {
-    const tabLoginBtn = document.getElementById('tabLoginBtn');
-    const tabRegisterBtn = document.getElementById('tabRegisterBtn');
-    const formLogin = document.getElementById('formLogin');
-    const formRegister = document.getElementById('formRegister');
-
-    if (tab === 'register') {
-      if (tabRegisterBtn) tabRegisterBtn.classList.add('active');
-      if (tabLoginBtn) tabLoginBtn.classList.remove('active');
-      if (formRegister) formRegister.style.display = 'flex';
-      if (formLogin) formLogin.style.display = 'none';
-      const regName = document.getElementById('regName');
-      if (regName) regName.focus();
-    } else {
-      if (tabLoginBtn) tabLoginBtn.classList.add('active');
-      if (tabRegisterBtn) tabRegisterBtn.classList.remove('active');
-      if (formLogin) formLogin.style.display = 'flex';
-      if (formRegister) formRegister.style.display = 'none';
-      const loginEmail = document.getElementById('loginEmail');
-      if (loginEmail) loginEmail.focus();
-    }
-  },
-
-  // Submit de Login
+  // Submit de Login (Aceita tanto usuário curto quanto e-mail)
   async handleLoginSubmit(e) {
     if (e && e.preventDefault) e.preventDefault();
-    const emailInput = document.getElementById('loginEmail');
+    const loginInput = document.getElementById('loginEmail');
     const passInput = document.getElementById('loginPassword');
-    const email = emailInput ? emailInput.value.trim() : '';
+    const loginVal = loginInput ? loginInput.value.trim() : '';
     const pass = passInput ? passInput.value.trim() : '';
     const submitBtn = document.getElementById('btnLoginSubmit');
 
-    if (!email || !pass) {
-      alert('Por favor, informe seu e-mail e sua senha.');
+    if (!loginVal || !pass) {
+      alert('Por favor, informe seu usuário ou e-mail e sua senha.');
       return;
     }
 
@@ -872,8 +952,8 @@ const App = {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span>⏳ Conectando...</span>';
       }
-      const user = await AuthManager.login(email, pass);
-      this.showToast(`Bem-vindo, ${user.displayName}!`, 'success');
+      const user = await AuthManager.login(loginVal, pass);
+      this.showToast(`Bem-vindo, ${user.displayName || user.email}!`, 'success');
       const form = document.getElementById('formLogin');
       if (form) form.reset();
     } catch (err) {
@@ -882,77 +962,6 @@ const App = {
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText || '<span>🚀 Entrar no Painel</span>';
-      }
-    }
-  },
-
-  isRegistering: false,
-
-  // Submit de Cadastro / Solicitação de Acesso
-  async handleRegisterSubmit(e) {
-    if (e && e.preventDefault) e.preventDefault();
-    if (this.isRegistering) return;
-
-    const nameInput = document.getElementById('regName');
-    const emailInput = document.getElementById('regEmail');
-    const passInput = document.getElementById('regPassword');
-    const name = nameInput ? nameInput.value.trim() : '';
-    const email = emailInput ? emailInput.value.trim() : '';
-    const pass = passInput ? passInput.value.trim() : '';
-    const submitBtn = document.getElementById('btnRegisterSubmit');
-
-    if (!name || !email || !pass) {
-      alert('Por favor, preencha todos os campos (Nome, E-mail e Senha).');
-      return;
-    }
-
-    if (pass.length < 6) {
-      alert('A senha deve ter no mínimo 6 caracteres.');
-      return;
-    }
-
-    const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
-
-    try {
-      this.isRegistering = true;
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span>⏳ Enviando solicitação...</span>';
-      }
-
-      const result = await AuthManager.register(name, email, pass);
-
-      if (result && result.pending) {
-        alert('🎉 Sua solicitação foi enviada com sucesso!\n\nSeu cadastro foi recebido e está aguardando a liberação do administrador (andrew.g.h.agh@gmail.com).\n\nAssim que for aprovado, basta entrar com seu e-mail e senha.');
-        const formReg = document.getElementById('formRegister');
-        if (formReg) formReg.reset();
-
-        // Preenche o e-mail na tela de login para facilitar o acesso
-        const loginEmail = document.getElementById('loginEmail');
-        if (loginEmail) loginEmail.value = email;
-
-        // Alterna para a aba de login
-        this.switchAuthTab('login');
-      } else {
-        this.showToast(`Bem-vindo, ${result.user ? result.user.displayName : name}!`, 'success');
-        const formReg = document.getElementById('formRegister');
-        if (formReg) formReg.reset();
-      }
-    } catch (err) {
-      const msg = err.message || String(err);
-      if (msg.includes('já possui cadastro') || msg.includes('email-already-in-use')) {
-        alert('ℹ️ Este e-mail já foi solicitado/cadastrado no sistema!\n\nSe você já solicitou o acesso, aguarde a liberação do administrador (andrew.g.h.agh@gmail.com).\n\nEstamos alternando para a aba de Login.');
-        const loginEmail = document.getElementById('loginEmail');
-        if (loginEmail) loginEmail.value = email;
-        this.switchAuthTab('login');
-      } else {
-        alert(msg || 'Erro ao processar cadastro.');
-      }
-    } finally {
-      this.isRegistering = false;
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtnText || '<span>✨ Criar Conta (Solicitar Acesso)</span>';
       }
     }
   },
