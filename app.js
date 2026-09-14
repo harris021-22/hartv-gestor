@@ -113,7 +113,7 @@ const App = {
   // Registrar Service Worker
   setupServiceWorker() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=30')
+      navigator.serviceWorker.register('./sw.js?v=33')
         .then((reg) => {
           console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
           reg.update().catch(() => {});
@@ -1193,7 +1193,7 @@ const App = {
       if (forgotUserInput) {
         if (typed) {
           forgotUserInput.value = typed;
-          this.handleForgotUserTyping(typed);
+          this.handleForgotUserTyping(typed, true);
         } else {
           const lockedBox = document.getElementById('forgotLockedBox');
           const emailGroup = document.getElementById('forgotEmailGroup');
@@ -1240,7 +1240,7 @@ const App = {
   },
 
   // Busca do usuário em tempo real ao digitar (Debounced com Mascaramento e Bloqueio Seguro)
-  handleForgotUserTyping(value) {
+  handleForgotUserTyping(value, immediate = false) {
     if (this._forgotSearchTimer) clearTimeout(this._forgotSearchTimer);
 
     const badge = document.getElementById('forgotLookupBadge');
@@ -1272,19 +1272,29 @@ const App = {
       badge.style.color = 'var(--text-dim)';
     }
 
-    this._forgotSearchTimer = setTimeout(async () => {
+    // Identificador único sequencial para eliminar condições de corrida em respostas fora de ordem
+    const searchSeq = ++this._forgotSearchSeq || (this._forgotSearchSeq = 1);
+
+    const executeSearch = async () => {
       try {
         const account = await AuthManager.findAccountByLogin(clean);
+
+        // PROTEÇÃO CONTRA CONDIÇÃO DE CORRIDA:
+        // Descartar resposta caso o usuário já tenha digitado outro valor no input ou uma busca mais nova tenha começado
+        if (searchSeq !== this._forgotSearchSeq) return;
+        const currentInput = document.getElementById('forgotUserInput');
+        if (currentInput && currentInput.value.trim().toLowerCase() !== clean.toLowerCase()) return;
+
         if (account) {
-          if (badge) {
-            badge.textContent = '✓ Conta localizada';
-            badge.style.color = '#34d399';
-          }
           const savedEmail = account.recoveryEmail || (!account.email?.endsWith('@hartv.app') ? account.email : '');
           if (savedEmail && savedEmail.includes('@')) {
             // E-MAIL FIXO E IMUTÁVEL:
-            // 1. Ocultar completamente o campo de digitação (impossível modificar)
+            // 1. Ocultar completamente o campo de digitação (impossível modificar ou inserir novo)
             // 2. Exibir exclusivamente o card protegido com e-mail mascarado (impossível ver completo)
+            if (badge) {
+              badge.textContent = '✓ Conta localizada';
+              badge.style.color = '#34d399';
+            }
             if (lockedBox) lockedBox.style.display = 'block';
             if (maskedDisplay) maskedDisplay.textContent = this.maskEmail(savedEmail);
             if (emailGroup) emailGroup.style.display = 'none';
@@ -1295,6 +1305,10 @@ const App = {
             }
           } else {
             // Conta localizada mas sem e-mail fixado: permitir digitação inicial
+            if (badge) {
+              badge.textContent = '✓ Conta localizada';
+              badge.style.color = '#38bdf8';
+            }
             if (lockedBox) lockedBox.style.display = 'none';
             if (emailGroup) emailGroup.style.display = 'block';
             if (emailInput) {
@@ -1323,9 +1337,15 @@ const App = {
           }
         }
       } catch (e) {
-        if (badge) badge.textContent = '';
+        if (searchSeq === this._forgotSearchSeq && badge) badge.textContent = '';
       }
-    }, 280);
+    };
+
+    if (immediate) {
+      executeSearch();
+    } else {
+      this._forgotSearchTimer = setTimeout(executeSearch, 250);
+    }
   },
 
   // Enviar link oficial de redefinição segura do Google

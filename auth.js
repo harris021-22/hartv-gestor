@@ -810,7 +810,7 @@ const AuthManager = {
       };
     }
 
-    // 2. Buscar no LocalStorage
+    // 2. Buscar no LocalStorage (cache inicial)
     const localAccounts = this.getLocalAccounts();
     const localMatch = localAccounts.find(a => 
       (a.username && a.username.toLowerCase() === cleanUsername) ||
@@ -821,46 +821,99 @@ const AuthManager = {
 
     let foundAccount = localMatch ? { ...localMatch } : null;
 
-    // 3. Buscar no Firestore (system_accounts)
+    // 3. Buscar no Firestore (system_accounts) - FONTE CANÔNICA DA VERDADE
+    // Sempre consultar o Firestore se a conta não foi achada localmente ou se ela não tem recoveryEmail válido!
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       try {
         const db = firebase.firestore();
+        let cloudDoc = null;
 
-        // Tentar buscar diretamente por doc id (username ou email)
-        if (!foundAccount && cleanUsername) {
+        // A) Buscar por ID direto do documento
+        if (cleanUsername) {
           const uDoc = await db.collection('system_accounts').doc(cleanUsername).get();
-          if (uDoc.exists) {
-            foundAccount = { uid: uDoc.id, ...uDoc.data() };
-          }
+          if (uDoc.exists) cloudDoc = { uid: uDoc.id, ...uDoc.data() };
         }
-
-        if (!foundAccount && cleanLower) {
+        if (!cloudDoc && cleanLower) {
           const eDoc = await db.collection('system_accounts').doc(cleanLower).get();
-          if (eDoc.exists) {
-            foundAccount = { uid: eDoc.id, ...eDoc.data() };
-          }
+          if (eDoc.exists) cloudDoc = { uid: eDoc.id, ...eDoc.data() };
         }
 
-        // Se ainda não achou, buscar por query de username ou loginDisplay
-        if (!foundAccount && cleanUsername) {
-          const q1 = await db.collection('system_accounts').where('username', '==', cleanUsername).limit(1).get();
+        // B) Buscar por username
+        if (cleanUsername) {
+          const q1 = await db.collection('system_accounts').where('username', '==', cleanUsername).get();
           q1.forEach(d => {
-            if (d.exists && !foundAccount) foundAccount = { uid: d.id, ...d.data() };
+            if (d.exists) {
+              const data = d.data();
+              if (!cloudDoc || (data.recoveryEmail && !cloudDoc.recoveryEmail)) {
+                cloudDoc = { uid: d.id, ...data };
+              }
+            }
           });
         }
 
-        if (!foundAccount && cleanLower.includes('@')) {
-          const q2 = await db.collection('system_accounts').where('recoveryEmail', '==', cleanLower).limit(1).get();
+        // C) Buscar por loginDisplay
+        if (cleanUsername) {
+          const qDisp = await db.collection('system_accounts').where('loginDisplay', '==', cleanUsername).get();
+          qDisp.forEach(d => {
+            if (d.exists) {
+              const data = d.data();
+              if (!cloudDoc || (data.recoveryEmail && !cloudDoc.recoveryEmail)) {
+                cloudDoc = { uid: d.id, ...data };
+              }
+            }
+          });
+        }
+
+        // D) Buscar com o texto original sem alteração de caracteres
+        if (!cloudDoc && raw && raw !== cleanUsername) {
+          const qRaw = await db.collection('system_accounts').where('username', '==', raw).get();
+          qRaw.forEach(d => {
+            if (d.exists) {
+              const data = d.data();
+              if (!cloudDoc || (data.recoveryEmail && !cloudDoc.recoveryEmail)) {
+                cloudDoc = { uid: d.id, ...data };
+              }
+            }
+          });
+        }
+
+        // E) Se a busca for por e-mail
+        if (cleanLower.includes('@')) {
+          const q2 = await db.collection('system_accounts').where('recoveryEmail', '==', cleanLower).get();
           q2.forEach(d => {
-            if (d.exists && !foundAccount) foundAccount = { uid: d.id, ...d.data() };
+            if (d.exists && !cloudDoc) cloudDoc = { uid: d.id, ...d.data() };
+          });
+          const q3 = await db.collection('system_accounts').where('email', '==', cleanLower).get();
+          q3.forEach(d => {
+            if (d.exists && !cloudDoc) cloudDoc = { uid: d.id, ...d.data() };
           });
         }
 
-        if (!foundAccount && cleanLower.includes('@')) {
-          const q3 = await db.collection('system_accounts').where('email', '==', cleanLower).limit(1).get();
-          q3.forEach(d => {
-            if (d.exists && !foundAccount) foundAccount = { uid: d.id, ...d.data() };
-          });
+        if (cloudDoc) {
+          // Mesclar os dados garantindo prioridade absoluta aos campos da nuvem
+          foundAccount = {
+            ...(foundAccount || {}),
+            ...cloudDoc,
+            recoveryEmail: cloudDoc.recoveryEmail || foundAccount?.recoveryEmail || ''
+          };
+
+          // Sincronizar o recoveryEmail no LocalStorage imediatamente
+          if (cloudDoc.recoveryEmail) {
+            try {
+              const accs = this.getLocalAccounts();
+              let updated = false;
+              accs.forEach(a => {
+                const matchU = (a.username && a.username.toLowerCase() === cleanUsername) || 
+                              (a.loginDisplay && a.loginDisplay.toLowerCase() === cleanUsername);
+                const matchUid = a.uid && cloudDoc.uid && a.uid === cloudDoc.uid;
+                if (matchU || matchUid) {
+                  a.recoveryEmail = cloudDoc.recoveryEmail;
+                  updated = true;
+                }
+              });
+              if (updated) this.saveLocalAccounts(accs);
+            } catch (e) {}
+          }
         }
       } catch (err) {
         console.warn('[Auth] Aviso ao buscar conta no Firestore:', err);
