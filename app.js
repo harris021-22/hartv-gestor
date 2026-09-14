@@ -1195,11 +1195,14 @@ const App = {
           forgotUserInput.value = typed;
           this.handleForgotUserTyping(typed);
         } else {
+          const lockedBox = document.getElementById('forgotLockedBox');
+          const emailGroup = document.getElementById('forgotEmailGroup');
+          if (lockedBox) lockedBox.style.display = 'none';
+          if (emailGroup) emailGroup.style.display = 'block';
           if (emailInput) {
             delete emailInput.dataset.fullEmail;
-            emailInput.readOnly = false;
-            emailInput.classList.remove('is-locked');
             emailInput.value = '';
+            emailInput.required = false;
           }
           setTimeout(() => { try { forgotUserInput.focus(); } catch (e) {} }, 100);
         }
@@ -1241,19 +1244,21 @@ const App = {
     if (this._forgotSearchTimer) clearTimeout(this._forgotSearchTimer);
 
     const badge = document.getElementById('forgotLookupBadge');
-    const savedTag = document.getElementById('forgotSavedTag');
+    const lockedBox = document.getElementById('forgotLockedBox');
+    const maskedDisplay = document.getElementById('forgotMaskedDisplay');
+    const emailGroup = document.getElementById('forgotEmailGroup');
     const emailInput = document.getElementById('forgotEmailInput');
     const emailHelp = document.getElementById('forgotEmailHelp');
     const clean = String(value || '').trim();
 
     if (!clean || clean.length < 2) {
       if (badge) badge.textContent = '';
-      if (savedTag) savedTag.style.display = 'none';
+      if (lockedBox) lockedBox.style.display = 'none';
+      if (emailGroup) emailGroup.style.display = 'block';
       if (emailInput) {
         delete emailInput.dataset.fullEmail;
-        emailInput.readOnly = false;
-        emailInput.classList.remove('is-locked');
         emailInput.value = '';
+        emailInput.required = false;
       }
       if (emailHelp) {
         emailHelp.innerHTML = 'Este e-mail ficará salvo vinculado à sua conta para suas próximas recuperações.';
@@ -1276,33 +1281,26 @@ const App = {
             badge.style.color = '#34d399';
           }
           const savedEmail = account.recoveryEmail || (!account.email?.endsWith('@hartv.app') ? account.email : '');
-          if (savedEmail) {
-            // E-mail existente: bloquear campo e mascarar visualmente para sigilo e segurança
+          if (savedEmail && savedEmail.includes('@')) {
+            // E-MAIL FIXO E IMUTÁVEL:
+            // 1. Ocultar completamente o campo de digitação (impossível modificar)
+            // 2. Exibir exclusivamente o card protegido com e-mail mascarado (impossível ver completo)
+            if (lockedBox) lockedBox.style.display = 'block';
+            if (maskedDisplay) maskedDisplay.textContent = this.maskEmail(savedEmail);
+            if (emailGroup) emailGroup.style.display = 'none';
             if (emailInput) {
               emailInput.dataset.fullEmail = savedEmail;
-              emailInput.value = this.maskEmail(savedEmail);
-              emailInput.readOnly = true;
-              emailInput.classList.add('is-locked');
-            }
-            if (savedTag) {
-              savedTag.style.display = 'inline-flex';
-              savedTag.style.alignItems = 'center';
-              savedTag.style.gap = '4px';
-              savedTag.innerHTML = '🔒 <span>E-mail fixo e protegido</span>';
-            }
-            if (emailHelp) {
-              emailHelp.innerHTML = '🔒 <em>E-mail protegido:</em> o link oficial será enviado diretamente para o e-mail cadastrado acima com total sigilo.';
-              emailHelp.style.color = '#34d399';
+              emailInput.value = '';
+              emailInput.required = false;
             }
           } else {
-            // Conta encontrada mas ainda sem e-mail: permitir digitação inicial
+            // Conta localizada mas sem e-mail fixado: permitir digitação inicial
+            if (lockedBox) lockedBox.style.display = 'none';
+            if (emailGroup) emailGroup.style.display = 'block';
             if (emailInput) {
               delete emailInput.dataset.fullEmail;
-              emailInput.readOnly = false;
-              emailInput.classList.remove('is-locked');
-              if (emailInput.value.includes('***')) emailInput.value = '';
+              emailInput.required = true;
             }
-            if (savedTag) savedTag.style.display = 'none';
             if (emailHelp) {
               emailHelp.innerHTML = '💡 <em>Primeira recuperação:</em> digite seu e-mail para vinculá-lo permanentemente à sua conta.';
               emailHelp.style.color = '#38bdf8';
@@ -1313,13 +1311,12 @@ const App = {
             badge.textContent = clean.includes('@') ? 'E-mail direto' : 'Usuário novo/não listado';
             badge.style.color = 'var(--text-muted)';
           }
+          if (lockedBox) lockedBox.style.display = 'none';
+          if (emailGroup) emailGroup.style.display = 'block';
           if (emailInput) {
             delete emailInput.dataset.fullEmail;
-            emailInput.readOnly = false;
-            emailInput.classList.remove('is-locked');
-            if (emailInput.value.includes('***')) emailInput.value = '';
+            emailInput.required = false;
           }
-          if (savedTag) savedTag.style.display = 'none';
           if (emailHelp) {
             emailHelp.innerHTML = 'Este e-mail ficará salvo vinculado à sua conta para suas próximas recuperações.';
             emailHelp.style.color = 'var(--text-dim)';
@@ -1351,8 +1348,8 @@ const App = {
       ? emailInput.dataset.fullEmail 
       : (emailInput ? emailInput.value.trim() : '');
 
-    if (!userVal || !emailVal) {
-      alert('Por favor, informe seu usuário e o e-mail de destino.');
+    if (!userVal) {
+      alert('Por favor, informe seu usuário ou login.');
       this._isSendingForgot = false;
       return;
     }

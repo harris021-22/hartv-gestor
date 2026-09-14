@@ -25,7 +25,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap">
 
   <!-- Estilos -->
-  <link rel="stylesheet" href="./style.css?v=31">
+  <link rel="stylesheet" href="./style.css?v=32">
 
   <!-- Pré-ativação Imediata do Tema (Zero Flicker) -->
   <script>
@@ -661,12 +661,26 @@
             <input type="text" id="forgotUserInput" class="form-input" placeholder="Ex: carlos ou seu@email.com" required autocomplete="username" oninput="App.handleForgotUserTyping(this.value)">
           </div>
 
-          <div class="form-group" id="forgotEmailGroup">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <label class="form-label" for="forgotEmailInput">E-mail para Receber o Link</label>
-              <span id="forgotSavedTag" style="font-size: 0.72rem; color: #34d399; font-weight: 600; display: none;">✓ E-mail salvo</span>
+          <!-- Card de E-mail Fixo e Mascarado (Usuário Já Possui E-mail Cadastrado) -->
+          <div id="forgotLockedBox" style="display: none; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.28); border-radius: var(--radius-sm); padding: 12px 14px; margin-top: 4px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 0.76rem; color: #34d399; font-weight: 700; display: flex; align-items: center; gap: 5px;">
+                <span>🔒 E-mail Vinculado (Fixo)</span>
+              </span>
+              <span style="font-size: 0.68rem; background: rgba(16, 185, 129, 0.2); color: #a7f3d0; padding: 2px 7px; border-radius: 9999px; font-weight: 700;">Protegido</span>
             </div>
-            <input type="email" id="forgotEmailInput" class="form-input" placeholder="seuemail@exemplo.com" required autocomplete="email">
+            <div id="forgotMaskedDisplay" style="font-family: monospace; font-size: 1.05rem; font-weight: 700; color: #ffffff; letter-spacing: 0.04em; padding: 8px 0 4px;">
+              ...
+            </div>
+            <div style="font-size: 0.73rem; color: var(--text-muted); line-height: 1.35;">
+              O link oficial do Google será enviado diretamente para este endereço. Por privacidade e segurança, o e-mail não pode ser alterado nem visualizado por completo.
+            </div>
+          </div>
+
+          <!-- Campo de Digitação de E-mail (Apenas para Contas Sem E-mail Cadastrado) -->
+          <div class="form-group" id="forgotEmailGroup" style="margin-top: 4px;">
+            <label class="form-label" for="forgotEmailInput">Cadastrar E-mail para Receber o Link</label>
+            <input type="email" id="forgotEmailInput" class="form-input" placeholder="seuemail@exemplo.com" autocomplete="email">
             <span id="forgotEmailHelp" style="font-size: 0.74rem; color: var(--text-dim); line-height: 1.3;">
               Este e-mail ficará salvo vinculado à sua conta para suas próximas recuperações.
             </span>
@@ -994,11 +1008,11 @@ service cloud.firestore {
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <!-- Scripts da Aplicação -->
-  <script src="./firebase-config.js?v=31"></script>
-  <script src="./auth.js?v=31"></script>
-  <script src="./database.js?v=31"></script>
-  <script src="./storage.js?v=31"></script>
-  <script src="./notifications.js?v=31"></script>
-  <script src="./app.js?v=31"></script>
+  <script src="./firebase-config.js?v=32"></script>
+  <script src="./auth.js?v=32"></script>
+  <script src="./database.js?v=32"></script>
+  <script src="./storage.js?v=32"></script>
+  <script src="./notifications.js?v=32"></script>
+  <script src="./app.js?v=32"></script>
 </body>
 </html>

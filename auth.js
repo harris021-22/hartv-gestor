@@ -880,10 +880,16 @@ const AuthManager = {
   },
 
   // SALVAR E-MAIL DE RECUPERAÇÃO VINCULADO PERMANENTEMENTE AO USUÁRIO
-  async saveRecoveryEmail(account, recoveryEmail) {
+  async saveRecoveryEmail(account, recoveryEmail, forceUpdate = false) {
     const cleanEmail = String(recoveryEmail || '').trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@')) {
       throw new Error('Por favor, informe um endereço de e-mail válido.');
+    }
+
+    // Regra de Proteção: Se a conta já possui e-mail de recuperação e não é forçado pelo Master, não alterar
+    if (!forceUpdate && account.recoveryEmail && account.recoveryEmail.includes('@')) {
+      console.log('[Auth] Conta já possui e-mail fixo cadastrado. Mantendo e-mail original:', account.recoveryEmail);
+      return false;
     }
 
     const updateObj = {
@@ -930,13 +936,10 @@ const AuthManager = {
   // RECUPERAÇÃO DE SENHA OFICIAL SEGURA (GOOGLE / FIREBASE)
   async sendOfficialPasswordReset(loginInput, emailInput) {
     const rawLogin = String(loginInput || '').trim();
-    const cleanEmail = String(emailInput || '').trim().toLowerCase();
+    const cleanInputEmail = String(emailInput || '').trim().toLowerCase();
 
     if (!rawLogin) {
       throw new Error('Por favor, informe seu usuário ou login.');
-    }
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      throw new Error('Por favor, informe um e-mail válido para receber o link.');
     }
 
     // 1. Localizar a conta
@@ -945,9 +948,23 @@ const AuthManager = {
       throw new Error(`Usuário "${rawLogin}" não foi encontrado no sistema. Verifique os dados ou contate o Administrador.`);
     }
 
-    // 2. Salvar o e-mail de recuperação vinculado permanentemente ao usuário
-    if (account) {
-      await this.saveRecoveryEmail(account, cleanEmail);
+    // 2. REGRA DE SEGURANÇA: Se o usuário já possui e-mail fixo, ele NÃO pode modificar
+    const existingEmail = account?.recoveryEmail || (!account?.email?.endsWith('@hartv.app') ? account?.email : '');
+    let targetEmail = '';
+
+    if (existingEmail && existingEmail.includes('@')) {
+      // E-mail fixo existente: ignora qualquer valor digitado e usa exclusivamente o e-mail cadastrado
+      targetEmail = existingEmail.toLowerCase().trim();
+      console.log('[Auth] Usuário possui e-mail fixo protegido. Destino fixo garantido:', targetEmail);
+    } else {
+      // Primeira recuperação: o e-mail informado será salvo de forma definitiva
+      if (!cleanInputEmail || !cleanInputEmail.includes('@')) {
+        throw new Error('Por favor, informe um e-mail válido para receber o link.');
+      }
+      targetEmail = cleanInputEmail;
+      if (account) {
+        await this.saveRecoveryEmail(account, targetEmail);
+      }
     }
 
     // 3. Enviar link oficial de redefinição com segurança oficial do Google
@@ -956,7 +973,7 @@ const AuthManager = {
         firebase.auth().languageCode = 'pt';
       } catch (e) {}
 
-      // 3. Garantir proativamente que o e-mail existe no Firebase Auth
+      // 3.1 Garantir proativamente que o e-mail existe no Firebase Auth
       // (Com a proteção contra enumeração de e-mails do Google, o sendPasswordResetEmail
       // retorna 200 mesmo se o e-mail não existir, mas o Google descarta o envio silenciosamente).
       try {
@@ -965,13 +982,13 @@ const AuthManager = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            email: cleanEmail,
+            email: targetEmail,
             password: 'Tmp_' + Math.random().toString(36).substring(2, 10) + '!9X',
           })
         });
         const signUpData = await resp.json();
         if (resp.ok && signUpData.localId) {
-          console.log('[Auth] Conta de recuperação criada no Firebase Auth sob demanda para:', cleanEmail);
+          console.log('[Auth] Conta de recuperação criada no Firebase Auth sob demanda para:', targetEmail);
           if (account?.uid && account.uid !== signUpData.localId) {
             try {
               const oldClientsKey = `hartv_clients_${account.uid}`;
@@ -989,11 +1006,11 @@ const AuthManager = {
 
       try {
         // Envio do link oficial de redefinição pelo Google Firebase Auth
-        await firebase.auth().sendPasswordResetEmail(cleanEmail);
-        console.log('[Auth] Link oficial do Google enviado com sucesso para:', cleanEmail);
+        await firebase.auth().sendPasswordResetEmail(targetEmail);
+        console.log('[Auth] Link oficial do Google enviado com sucesso para:', targetEmail);
         return {
           success: true,
-          email: cleanEmail,
+          email: targetEmail,
           account: account
         };
       } catch (fbErr) {
@@ -1004,7 +1021,7 @@ const AuthManager = {
 
     return {
       success: true,
-      email: cleanEmail,
+      email: targetEmail,
       account: account
     };
   },
