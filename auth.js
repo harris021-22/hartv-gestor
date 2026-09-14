@@ -598,11 +598,12 @@ const AuthManager = {
 
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       const db = firebase.firestore();
+      const fbUser = firebase.auth ? firebase.auth().currentUser : null;
 
-      // 1. Buscar em users/{admin.uid}/managed_users (100% de sucesso mesmo com regras padrão!)
-      if (this.currentUser && this.currentUser.uid) {
+      // 1. Buscar em users/{admin.uid}/managed_users (requer usuário autenticado no Firebase Auth)
+      if (fbUser && fbUser.uid) {
         try {
-          const snap = await db.collection('users').doc(this.currentUser.uid).collection('managed_users').get();
+          const snap = await db.collection('users').doc(fbUser.uid).collection('managed_users').get();
           snap.forEach(doc => {
             if (doc.exists) {
               const d = doc.data() || {};
@@ -610,11 +611,13 @@ const AuthManager = {
             }
           });
         } catch (e) {
-          console.warn('[Auth] Aviso ao buscar managed_users:', e);
+          if (e.code !== 'permission-denied') {
+            console.warn('[Auth] Aviso ao buscar managed_users:', e);
+          }
         }
       }
 
-      // 2. Buscar em system_accounts
+      // 2. Buscar em system_accounts (caso as regras estejam publicadas no Firebase Console)
       try {
         const snap = await db.collection('system_accounts').get();
         snap.forEach(doc => {
@@ -628,7 +631,9 @@ const AuthManager = {
           }
         });
       } catch (e) {
-        console.warn('Erro ao listar system_accounts no Firestore:', e);
+        if (e.code !== 'permission-denied') {
+          console.warn('Erro ao listar system_accounts no Firestore:', e);
+        }
       }
     }
 
