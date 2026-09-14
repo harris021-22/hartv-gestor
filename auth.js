@@ -956,8 +956,39 @@ const AuthManager = {
         firebase.auth().languageCode = 'pt';
       } catch (e) {}
 
+      // 3. Garantir proativamente que o e-mail existe no Firebase Auth
+      // (Com a proteção contra enumeração de e-mails do Google, o sendPasswordResetEmail
+      // retorna 200 mesmo se o e-mail não existir, mas o Google descarta o envio silenciosamente).
       try {
-        // Envio direto do link oficial de redefinição (200 OK sem disparar erro 400 no console)
+        const restUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`;
+        const resp = await fetch(restUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanEmail,
+            password: 'Tmp_' + Math.random().toString(36).substring(2, 10) + '!9X',
+          })
+        });
+        const signUpData = await resp.json();
+        if (resp.ok && signUpData.localId) {
+          console.log('[Auth] Conta de recuperação criada no Firebase Auth sob demanda para:', cleanEmail);
+          if (account?.uid && account.uid !== signUpData.localId) {
+            try {
+              const oldClientsKey = `hartv_clients_${account.uid}`;
+              const newClientsKey = `hartv_clients_${signUpData.localId}`;
+              const oldClients = localStorage.getItem(oldClientsKey);
+              if (oldClients && oldClients !== '[]') {
+                localStorage.setItem(newClientsKey, oldClients);
+              }
+            } catch (e) {}
+          }
+        }
+      } catch (ensureErr) {
+        console.warn('[Auth] Aviso ao verificar/criar registro auxiliar:', ensureErr);
+      }
+
+      try {
+        // Envio do link oficial de redefinição pelo Google Firebase Auth
         await firebase.auth().sendPasswordResetEmail(cleanEmail);
         console.log('[Auth] Link oficial do Google enviado com sucesso para:', cleanEmail);
         return {
@@ -966,43 +997,6 @@ const AuthManager = {
           account: account
         };
       } catch (fbErr) {
-        // Se a conta ainda não existir no Firebase Auth (código auth/user-not-found), registrar sob demanda
-        if (fbErr && (fbErr.code === 'auth/user-not-found' || (fbErr.message && fbErr.message.includes('user-not-found')))) {
-          console.log('[Auth] Usuário não registrado no Firebase Auth. Criando registro auxiliar...');
-          try {
-            const restUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`;
-            const resp = await fetch(restUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: cleanEmail,
-                password: 'Tmp_' + Math.random().toString(36).substring(2, 10) + '!9X',
-              })
-            });
-            const signUpData = await resp.json();
-            if (resp.ok) {
-              if (signUpData.localId && account?.uid && account.uid !== signUpData.localId) {
-                try {
-                  const oldClientsKey = `hartv_clients_${account.uid}`;
-                  const newClientsKey = `hartv_clients_${signUpData.localId}`;
-                  const oldClients = localStorage.getItem(oldClientsKey);
-                  if (oldClients && oldClients !== '[]') {
-                    localStorage.setItem(newClientsKey, oldClients);
-                  }
-                } catch (e) {}
-              }
-              await firebase.auth().sendPasswordResetEmail(cleanEmail);
-              console.log('[Auth] Link oficial do Google enviado após criação para:', cleanEmail);
-              return {
-                success: true,
-                email: cleanEmail,
-                account: account
-              };
-            }
-          } catch (createErr) {
-            console.warn('[Auth] Falha no registro auxiliar:', createErr);
-          }
-        }
         console.warn('[Auth] Erro ao enviar reset email pelo Firebase:', fbErr);
         throw new Error(this.translateFirebaseError(fbErr));
       }

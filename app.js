@@ -1172,11 +1172,16 @@ const App = {
   showForgotView() {
     const loginView = document.getElementById('authLoginView');
     const forgotView = document.getElementById('authForgotView');
+    const tabLogin = document.getElementById('tabAuthLogin');
+    const tabForgot = document.getElementById('tabAuthForgot');
     const loginEmailInput = document.getElementById('loginEmail');
     const forgotUserInput = document.getElementById('forgotUserInput');
     const resultBox = document.getElementById('forgotResultBox');
     const formForgot = document.getElementById('formForgotPass');
     const emailInput = document.getElementById('forgotEmailInput');
+
+    if (tabLogin) tabLogin.classList.remove('active');
+    if (tabForgot) tabForgot.classList.add('active');
 
     if (resultBox) resultBox.style.display = 'none';
     if (formForgot) formForgot.style.display = 'flex';
@@ -1196,9 +1201,13 @@ const App = {
             emailInput.classList.remove('is-locked');
             emailInput.value = '';
           }
-          forgotUserInput.focus();
+          setTimeout(() => { try { forgotUserInput.focus(); } catch (e) {} }, 100);
         }
       }
+      try {
+        const card = document.querySelector('.auth-card');
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (e) {}
     }
   },
 
@@ -1206,8 +1215,13 @@ const App = {
   showLoginView() {
     const loginView = document.getElementById('authLoginView');
     const forgotView = document.getElementById('authForgotView');
+    const tabLogin = document.getElementById('tabAuthLogin');
+    const tabForgot = document.getElementById('tabAuthForgot');
     const loginEmailInput = document.getElementById('loginEmail');
     const forgotUserInput = document.getElementById('forgotUserInput');
+
+    if (tabLogin) tabLogin.classList.add('active');
+    if (tabForgot) tabForgot.classList.remove('active');
 
     if (forgotView) forgotView.style.display = 'none';
     if (loginView) {
@@ -1215,6 +1229,10 @@ const App = {
       if (forgotUserInput && loginEmailInput && forgotUserInput.value.trim()) {
         loginEmailInput.value = forgotUserInput.value.trim();
       }
+      try {
+        const card = document.querySelector('.auth-card');
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (e) {}
     }
   },
 

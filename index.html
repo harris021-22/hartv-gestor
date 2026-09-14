@@ -25,7 +25,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap">
 
   <!-- Estilos -->
-  <link rel="stylesheet" href="./style.css?v=22.1">
+  <link rel="stylesheet" href="./style.css?v=31">
 
   <!-- Pré-ativação Imediata do Tema (Zero Flicker) -->
   <script>
@@ -598,6 +598,16 @@
         <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 4px;">Acesso exclusivo ao painel</p>
       </div>
 
+      <!-- Abas de Navegação Direta (Login / Recuperação de Senha) -->
+      <div class="auth-tabs" id="authTabsNav" style="margin-bottom: 4px;">
+        <button type="button" class="auth-tab active" id="tabAuthLogin" onclick="App.showLoginView()">
+          <span>🔑 Entrar no Painel</span>
+        </button>
+        <button type="button" class="auth-tab" id="tabAuthForgot" onclick="App.showForgotView()">
+          <span>🔄 Esqueci a Senha</span>
+        </button>
+      </div>
+
       <!-- VIEW 1: Login -->
       <div id="authLoginView">
         <form id="formLogin" class="auth-form" onsubmit="App.handleLoginSubmit(event)">
@@ -642,7 +652,7 @@
           </p>
         </div>
 
-        <form id="formForgotPass" class="auth-form" style="margin-top: 12px;">
+        <form id="formForgotPass" class="auth-form" style="margin-top: 12px;" onsubmit="App.handleForgotSubmit(event)">
           <div class="form-group">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <label class="form-label" for="forgotUserInput">Seu Usuário ou Login</label>
@@ -681,8 +691,11 @@
           <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; margin-top: 10px;">
             Enviamos o link seguro do Google para o seu e-mail cadastrado. Acesse sua caixa de entrada e clique no link para redefinir sua senha com segurança.
           </p>
-          <div style="font-size: 0.74rem; color: #fbbf24; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px; padding: 8px 10px; margin-top: 8px;">
-            💡 <strong>Dica:</strong> Se não encontrar na caixa de entrada principal, dê uma olhada na pasta de <strong>Spam / Lixo Eletrônico</strong>.
+          <div style="font-size: 0.74rem; color: #fbbf24; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px; padding: 8px 10px; margin-top: 8px; line-height: 1.4;">
+            💡 <strong>Dica importante:</strong> Se não encontrar na caixa de entrada principal dentro de 1 minuto, verifique a pasta de <strong>Spam / Lixo Eletrônico</strong> do seu provedor de e-mail.
+          </div>
+          <div style="font-size: 0.73rem; color: #93c5fd; background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 6px; padding: 8px 10px; margin-top: 8px; line-height: 1.35;">
+            💬 <strong>Não recebeu o e-mail?</strong> O Administrador Master pode redefinir ou fornecer seus dados de acesso diretamente pelo painel administrativo.
           </div>
           <button type="button" class="btn btn-primary" onclick="App.showLoginView()" style="width: 100%; justify-content: center; padding: 11px; margin-top: 12px;">
             <span>Ir para Tela de Login</span>
@@ -981,11 +994,11 @@ service cloud.firestore {
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <!-- Scripts da Aplicação -->
-  <script src="./firebase-config.js?v=22.6"></script>
-  <script src="./auth.js?v=22.6"></script>
-  <script src="./database.js?v=22.6"></script>
-  <script src="./storage.js?v=22.6"></script>
-  <script src="./notifications.js?v=22.6"></script>
-  <script src="./app.js?v=22.6"></script>
+  <script src="./firebase-config.js?v=31"></script>
+  <script src="./auth.js?v=31"></script>
+  <script src="./database.js?v=31"></script>
+  <script src="./storage.js?v=31"></script>
+  <script src="./notifications.js?v=31"></script>
+  <script src="./app.js?v=31"></script>
 </body>
 </html>
