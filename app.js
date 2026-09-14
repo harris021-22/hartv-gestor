@@ -113,7 +113,7 @@ const App = {
   // Registrar Service Worker
   setupServiceWorker() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=21')
+      navigator.serviceWorker.register('./sw.js?v=27')
         .then((reg) => {
           console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
           reg.update().catch(() => {});
@@ -976,8 +976,17 @@ const App = {
       }
 
       container.innerHTML = purgeHeader + accounts.map(acc => {
-        const isMaster = AuthManager.isMasterEmail(acc.email);
-        const isCurrent = isMaster || (currentUser && currentUser.uid === acc.uid) || (currentUser && currentUser.email && currentUser.email.toLowerCase() === acc.email.toLowerCase());
+        const masterEmail = 'andrew.g.h.agh@gmail.com';
+        const accEmail = String(acc.email || '').toLowerCase().trim();
+        const accUser = String(acc.username || '').toLowerCase().trim();
+        const isMaster = accEmail === masterEmail || accUser === 'admin' || accUser === 'andrew';
+
+        // (Você) só deve aparecer para a conta REALMENTE logada no momento
+        const isCurrent = currentUser && (
+          (currentUser.email && currentUser.email.toLowerCase() === accEmail) ||
+          (currentUser.uid && acc.uid && currentUser.uid === acc.uid && isMaster === (currentUser.role === 'admin'))
+        );
+
         const status = acc.status || 'approved';
         let statusBadge = '<span class="status-pill approved">Ativo</span>';
         if (status === 'blocked') statusBadge = '<span class="status-pill blocked">Bloqueado</span>';
@@ -991,7 +1000,9 @@ const App = {
             <div class="account-info">
               <div class="account-name-row">
                 <span class="account-name">${this.escapeHtml(displayName)}</span>
-                ${isMaster ? '<span style="font-size: 0.65rem; background: rgba(139, 92, 246, 0.2); color: #c084fc; padding: 2px 6px; border-radius: 4px; font-weight: 700;">ADMIN MASTER</span>' : ''}
+                ${isMaster 
+                  ? '<span style="font-size: 0.65rem; background: rgba(139, 92, 246, 0.2); color: #c084fc; padding: 2px 6px; border-radius: 4px; font-weight: 700;">ADMIN MASTER</span>' 
+                  : '<span style="font-size: 0.65rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Usuário</span>'}
                 ${isCurrent ? '<span style="font-size: 0.65rem; color: #38bdf8;">(Você)</span>' : ''}
               </div>
               <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px;">

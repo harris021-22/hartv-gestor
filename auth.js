@@ -1059,14 +1059,20 @@ const AuthManager = {
       });
     }
 
-    // Blindagem: APENAS Contas Master podem ter role: admin
+    // Blindagem definitiva: APENAS E EXCLUSIVAMENTE andrew.g.h.agh@gmail.com pode ter role admin
     list.forEach(a => {
-      if (this.isMasterEmail(a.email) || this.isMasterEmail(a.username)) {
+      const emailLower = String(a.email || '').toLowerCase().trim();
+      const userLower = String(a.username || '').toLowerCase().trim();
+      const isMasterAcc = emailLower === masterEmail || userLower === 'admin' || userLower === 'andrew';
+      if (isMasterAcc) {
         a.role = 'admin';
         a.status = 'approved';
         a.uid = masterUid;
       } else {
         a.role = 'user';
+        if (a.uid === masterUid) {
+          a.uid = a.docId || ('usr_' + (a.username || a.email || Date.now()));
+        }
       }
     });
 
