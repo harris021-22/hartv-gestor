@@ -82,12 +82,33 @@ const StorageManager = {
       const key = this.getClientsKey();
       let data = localStorage.getItem(key);
 
-      // Migração automática transparente dos clientes legados para o primeiro usuário logado
-      if (!data && key !== 'hartv_clients_guest') {
+      // Se a chave atual estiver vazia ou com lista vazia [], recuperar de outras chaves locais
+      const isEmpty = !data || data === '[]' || data === '{}';
+      if (isEmpty && key !== 'hartv_clients_guest') {
+        // 1. Tentar dados legados
         const legacyData = localStorage.getItem(this.LEGACY_CLIENTS_KEY);
-        if (legacyData) {
+        if (legacyData && legacyData !== '[]') {
           localStorage.setItem(key, legacyData);
           data = legacyData;
+        } else {
+          // 2. Procurar em qualquer outra chave hartv_clients_* que possua clientes salvos
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('hartv_clients_') && k !== key && k !== 'hartv_clients_guest') {
+              const candidate = localStorage.getItem(k);
+              if (candidate && candidate !== '[]' && candidate !== '{}') {
+                try {
+                  const parsed = JSON.parse(candidate);
+                  if (Array.isArray(parsed) && parsed.length > 0) {
+                    console.log(`[Storage] Preservando ${parsed.length} cliente(s) da chave anterior "${k}" para "${key}"`);
+                    localStorage.setItem(key, candidate);
+                    data = candidate;
+                    break;
+                  }
+                } catch (e) {}
+              }
+            }
+          }
         }
       }
 

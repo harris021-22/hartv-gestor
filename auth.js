@@ -355,15 +355,9 @@ const AuthManager = {
         }
       }
 
-      // B) Salvar em system_accounts (caso as regras estejam publicadas)
+      // B) Salvar em system_accounts (apenas no documento canônico uid para evitar duplicatas)
       try {
         await db.collection('system_accounts').doc(uid).set(accountData, { merge: true });
-        if (email) {
-          await db.collection('system_accounts').doc(email).set(accountData, { merge: true });
-        }
-        if (username) {
-          await db.collection('system_accounts').doc(username).set(accountData, { merge: true });
-        }
         firestoreSaved = true;
       } catch (fsErr) {
         console.warn('[Auth] Aviso ao salvar em system_accounts:', fsErr);
@@ -398,52 +392,81 @@ const AuthManager = {
     }
     const cleanEmail = String(email || '').trim().toLowerCase();
 
-    // 1. Tentar atualizar no Firebase Auth via REST se possível
-    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && firebaseConfig.apiKey && cleanEmail) {
-      try {
-        if (oldPassword) {
-          const sRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: cleanEmail, password: oldPassword, returnSecureToken: true })
-          });
-          const sData = await sRes.json();
-          if (sRes.ok && sData.idToken) {
-            await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, {
+    // Localizar a conta de destino para obter emails vinculados e senhas anteriores
+    const accounts = this.getLocalAccounts();
+    const targetAcc = accounts.find(a => 
+      (uid && (a.uid === uid || a.docId === uid)) ||
+      (cleanEmail && ((a.email && a.email.toLowerCase() === cleanEmail) || (a.recoveryEmail && a.recoveryEmail.toLowerCase() === cleanEmail)))
+    );
+
+    const candidateEmails = [...new Set([
+      cleanEmail,
+      targetAcc?.email?.toLowerCase(),
+      targetAcc?.recoveryEmail?.toLowerCase(),
+      targetAcc?.username ? `${targetAcc.username.toLowerCase()}@hartv.app` : null
+    ].filter(e => e && e.includes('@')))];
+
+    const candidateOldPasswords = [...new Set([
+      oldPassword,
+      targetAcc?.plainPassword,
+      targetAcc?.previousPassword
+    ].filter(p => p && String(p).trim()))];
+
+    // 1. Atualizar no Firebase Auth via REST se possível para todos os e-mails da conta
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && firebaseConfig.apiKey) {
+      for (const candEmail of candidateEmails) {
+        for (const candOldPass of candidateOldPasswords) {
+          try {
+            const sRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ idToken: sData.idToken, password: cleanPass, returnSecureToken: true })
+              body: JSON.stringify({ email: candEmail, password: candOldPass, returnSecureToken: true })
             });
-            console.log('[Auth] Senha atualizada no Firebase Auth via REST.');
+            const sData = await sRes.json();
+            if (sRes.ok && sData.idToken) {
+              await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken: sData.idToken, password: cleanPass, returnSecureToken: true })
+              });
+              console.log(`[Auth] Senha do Firebase Auth atualizada via REST para ${candEmail}.`);
+              break; // Sucesso para este email, ir para o próximo
+            }
+          } catch (e) {
+            console.warn(`[Auth] Aviso ao atualizar senha Firebase para ${candEmail}:`, e);
           }
         }
-      } catch (e) {
-        console.warn('[Auth] Erro ao atualizar senha no Firebase Auth via REST:', e);
       }
 
-      // Atualizar no Firestore
+      // 2. Atualizar no Firestore (apenas no documento canônico do UID)
       try {
         const db = firebase.firestore();
         const updateObj = {
           plainPassword: cleanPass,
+          previousPassword: oldPassword || (targetAcc && targetAcc.plainPassword) || '',
           updatedAt: new Date().toISOString()
         };
-        if (this.currentUser && this.currentUser.uid && uid) {
-          await db.collection('users').doc(this.currentUser.uid).collection('managed_users').doc(String(uid)).set(updateObj, { merge: true });
+        const canonicalUid = uid || targetAcc?.uid;
+        if (this.currentUser && this.currentUser.uid && canonicalUid) {
+          await db.collection('users').doc(this.currentUser.uid).collection('managed_users').doc(String(canonicalUid)).set(updateObj, { merge: true });
         }
-        if (uid) await db.collection('system_accounts').doc(String(uid)).set(updateObj, { merge: true });
-        if (cleanEmail) await db.collection('system_accounts').doc(cleanEmail).set(updateObj, { merge: true });
+        if (canonicalUid) {
+          await db.collection('system_accounts').doc(String(canonicalUid)).set(updateObj, { merge: true });
+        }
       } catch (e) {
         console.warn('[Auth] Erro ao atualizar senha no Firestore:', e);
       }
     }
 
-    // 2. Atualizar no LocalStorage
-    const accounts = this.getLocalAccounts();
+    // 3. Atualizar no LocalStorage
     accounts.forEach(a => {
-      if ((uid && a.uid === uid) || (cleanEmail && a.email && a.email.toLowerCase() === cleanEmail)) {
-        a.passwordHash = this.simpleHash(cleanPass);
+      const matchUid = (uid && (a.uid === uid || a.docId === uid)) || (targetAcc?.uid && a.uid === targetAcc.uid);
+      const matchEmail = cleanEmail && ((a.email && a.email.toLowerCase() === cleanEmail) || (a.recoveryEmail && a.recoveryEmail.toLowerCase() === cleanEmail));
+      const matchUser = targetAcc && targetAcc.username && a.username && a.username.toLowerCase() === targetAcc.username.toLowerCase();
+      if (matchUid || matchEmail || matchUser) {
+        a.previousPassword = a.plainPassword || oldPassword || '';
         a.plainPassword = cleanPass;
+        a.passwordHash = this.simpleHash(cleanPass);
       }
     });
     this.saveLocalAccounts(accounts);
@@ -571,23 +594,49 @@ const AuthManager = {
         }
       }
 
+      // Auto-recuperação/auto-sincronização: se a senha bate com a cadastrada no sistema mas o Firebase Auth falhou,
+      // tentar autenticar com a senha anterior para atualizar automaticamente a senha na nuvem
+      if (!firebaseUser && account && ((account.plainPassword && account.plainPassword === cleanPass) || (account.passwordHash && account.passwordHash === this.simpleHash(cleanPass)))) {
+        const candidateOlds = [account.previousPassword, '123456', '1234567'].filter(Boolean);
+        for (const testEmail of uniqueEmails) {
+          for (const oldP of candidateOlds) {
+            try {
+              const cred = await firebase.auth().signInWithEmailAndPassword(testEmail, oldP);
+              if (cred && cred.user) {
+                await cred.user.updatePassword(cleanPass);
+                firebaseUser = cred.user;
+                console.log(`[Auth] Senha do Firebase Auth atualizada automaticamente via login para ${testEmail}!`);
+                break;
+              }
+            } catch (syncErr) {}
+          }
+          if (firebaseUser) break;
+        }
+      }
+
       if (firebaseUser) {
         const firebaseUid = firebaseUser.uid;
 
-        // Migrar dados locais se a conta possuía um UID local diferente (ex: gerado localmente como usr_...)
+        // Migrar dados locais se a conta possuía um UID local diferente
         if (account?.uid && account.uid !== firebaseUid) {
           try {
             const oldClientsKey = `hartv_clients_${account.uid}`;
             const newClientsKey = `hartv_clients_${firebaseUid}`;
             const oldClients = localStorage.getItem(oldClientsKey);
-            if (oldClients && !localStorage.getItem(newClientsKey)) {
-              localStorage.setItem(newClientsKey, oldClients);
+            if (oldClients && oldClients !== '[]' && oldClients !== '{}') {
+              const currentNew = localStorage.getItem(newClientsKey);
+              if (!currentNew || currentNew === '[]' || currentNew === '{}') {
+                localStorage.setItem(newClientsKey, oldClients);
+              }
             }
             const oldSettingsKey = `hartv_settings_${account.uid}`;
             const newSettingsKey = `hartv_settings_${firebaseUid}`;
             const oldSettings = localStorage.getItem(oldSettingsKey);
-            if (oldSettings && !localStorage.getItem(newSettingsKey)) {
-              localStorage.setItem(newSettingsKey, oldSettings);
+            if (oldSettings && oldSettings !== '{}') {
+              const currentNewSettings = localStorage.getItem(newSettingsKey);
+              if (!currentNewSettings || currentNewSettings === '{}') {
+                localStorage.setItem(newSettingsKey, oldSettings);
+              }
             }
           } catch (e) {
             console.warn('[Auth] Erro ao migrar cache local de clientes:', e);
@@ -595,7 +644,6 @@ const AuthManager = {
         }
 
         // O UID da sessão ativa DEVE ser o firebaseUid para cumprir a regra de segurança do Firestore
-        // (match /users/{userId}/{document=**} { allow read, write: if request.auth.uid == userId; })
         const userUid = firebaseUid;
 
         const check = await this.checkUserApprovalStatus(userUid, firebaseUser.email);
@@ -606,7 +654,7 @@ const AuthManager = {
           throw new Error('🚫 Sua conta foi desativada pelo administrador.');
         }
 
-        // Sincronizar nova senha e UID no Firestore system_accounts
+        // Sincronizar nova senha e UID no Firestore system_accounts (apenas no documento canônico)
         const updatePassObj = {
           uid: firebaseUid,
           plainPassword: cleanPass,
@@ -614,10 +662,19 @@ const AuthManager = {
         };
         try {
           const db = firebase.firestore();
-          if (account?.uid) await db.collection('system_accounts').doc(String(account.uid)).set(updatePassObj, { merge: true });
-          if (account?.username) await db.collection('system_accounts').doc(account.username.toLowerCase()).set(updatePassObj, { merge: true });
-          if (firebaseUser.email) await db.collection('system_accounts').doc(firebaseUser.email.toLowerCase()).set(updatePassObj, { merge: true });
           await db.collection('system_accounts').doc(firebaseUid).set(updatePassObj, { merge: true });
+
+          // Se o UID anterior no Firestore for diferente, migrar dados e limpar documento antigo para não duplicar
+          if (account?.uid && account.uid !== firebaseUid) {
+            try {
+              const oldDocSnap = await db.collection('system_accounts').doc(String(account.uid)).get();
+              if (oldDocSnap.exists) {
+                const oldData = oldDocSnap.data() || {};
+                await db.collection('system_accounts').doc(firebaseUid).set({ ...oldData, ...updatePassObj }, { merge: true });
+                await db.collection('system_accounts').doc(String(account.uid)).delete();
+              }
+            } catch (migErr) {}
+          }
         } catch (e) {
           console.warn('[Auth] Aviso ao sincronizar nova senha no Firestore:', e);
         }
@@ -782,6 +839,13 @@ const AuthManager = {
             if (d.exists && !foundAccount) foundAccount = { uid: d.id, ...d.data() };
           });
         }
+
+        if (!foundAccount && cleanLower.includes('@')) {
+          const q3 = await db.collection('system_accounts').where('email', '==', cleanLower).limit(1).get();
+          q3.forEach(d => {
+            if (d.exists && !foundAccount) foundAccount = { uid: d.id, ...d.data() };
+          });
+        }
       } catch (err) {
         console.warn('[Auth] Aviso ao buscar conta no Firestore:', err);
       }
@@ -811,31 +875,13 @@ const AuthManager = {
       updatedAt: new Date().toISOString()
     };
 
-    // 1. Atualizar no Firestore
+    // 1. Atualizar no Firestore (apenas no documento canônico da conta)
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       try {
         const db = firebase.firestore();
         if (account.uid) {
           await db.collection('system_accounts').doc(String(account.uid)).set(updateObj, { merge: true });
         }
-        if (account.email) {
-          await db.collection('system_accounts').doc(account.email.toLowerCase()).set(updateObj, { merge: true });
-        }
-        if (account.username) {
-          await db.collection('system_accounts').doc(account.username.toLowerCase()).set(updateObj, { merge: true });
-        }
-        // Criar/atualizar documento indexado pelo recoveryEmail apontando para a conta original
-        const fullAccountRecord = {
-          uid: account.uid || 'usr_' + Date.now(),
-          username: account.username || account.loginDisplay || '',
-          displayName: account.displayName || account.username || '',
-          email: cleanEmail,
-          recoveryEmail: cleanEmail,
-          status: 'approved',
-          role: 'user',
-          updatedAt: new Date().toISOString()
-        };
-        await db.collection('system_accounts').doc(cleanEmail).set(fullAccountRecord, { merge: true });
       } catch (e) {
         console.warn('[Auth] Aviso ao salvar recoveryEmail no Firestore:', e);
       }
@@ -915,10 +961,20 @@ const AuthManager = {
               body: JSON.stringify({
                 email: cleanEmail,
                 password: 'Tmp_' + Math.random().toString(36).substring(2, 10) + '!9X',
-                returnSecureToken: false
               })
             });
+            const signUpData = await resp.json();
             if (resp.ok) {
+              if (signUpData.localId && account?.uid && account.uid !== signUpData.localId) {
+                try {
+                  const oldClientsKey = `hartv_clients_${account.uid}`;
+                  const newClientsKey = `hartv_clients_${signUpData.localId}`;
+                  const oldClients = localStorage.getItem(oldClientsKey);
+                  if (oldClients && oldClients !== '[]') {
+                    localStorage.setItem(newClientsKey, oldClients);
+                  }
+                } catch (e) {}
+              }
               await firebase.auth().sendPasswordResetEmail(cleanEmail);
               console.log('[Auth] Link oficial do Google enviado após criação para:', cleanEmail);
               return {
@@ -1011,42 +1067,59 @@ const AuthManager = {
     }
 
     const localList = this.getLocalAccounts();
+    const rawList = [...cloudList, ...localList];
+    const mergedGroups = [];
 
-    // Combinar contas da nuvem e contas locais sem duplicar por email ou username
-    const map = new Map();
-    localList.forEach(acc => {
-      if (acc && acc.email) map.set(acc.email.toLowerCase(), acc);
-      if (acc && acc.username) map.set(acc.username.toLowerCase(), acc);
-    });
-    cloudList.forEach(acc => {
-      if (acc && (acc.email || acc.username)) {
-        const key = (acc.email || acc.username).toLowerCase();
-        const existing = map.get(key);
-        let mergedStatus = acc.status || (existing && existing.status) || 'approved';
-        if ((existing && existing.status === 'blocked') || acc.status === 'blocked') {
-          mergedStatus = 'blocked';
-        }
+    for (const acc of rawList) {
+      if (!acc) continue;
+      const u = (acc.username || '').toLowerCase().trim();
+      const e = (acc.email || '').toLowerCase().trim();
+      const r = (acc.recoveryEmail || '').toLowerCase().trim();
+      const uid = (acc.uid || '').trim();
 
-        const merged = {
-          ...(existing || {}),
-          ...acc,
-          status: mergedStatus
+      // Verificar se pertence a algum grupo já identificado
+      let group = mergedGroups.find(g => {
+        if (u && g.usernames.has(u)) return true;
+        if (e && (g.emails.has(e) || g.recoveryEmails.has(e))) return true;
+        if (r && (g.emails.has(r) || g.recoveryEmails.has(r))) return true;
+        if (uid && g.uids.has(uid)) return true;
+        return false;
+      });
+
+      if (!group) {
+        group = {
+          usernames: new Set(),
+          emails: new Set(),
+          recoveryEmails: new Set(),
+          uids: new Set(),
+          records: []
         };
-        if (acc.email) map.set(acc.email.toLowerCase(), merged);
-        if (acc.username) map.set(acc.username.toLowerCase(), merged);
+        mergedGroups.push(group);
       }
-    });
 
-    // Remover duplicatas
-    const uniqueMap = new Map();
-    Array.from(map.values()).forEach(acc => {
-      const idKey = acc.uid || acc.email || acc.username;
-      if (idKey && !uniqueMap.has(idKey)) {
-        uniqueMap.set(idKey, acc);
+      if (u) group.usernames.add(u);
+      if (e) group.emails.add(e);
+      if (r) group.recoveryEmails.add(r);
+      if (uid) group.uids.add(uid);
+      group.records.push(acc);
+    }
+
+    const list = mergedGroups.map(g => {
+      let finalAcc = {};
+      for (const r of g.records) {
+        finalAcc = { ...finalAcc, ...r };
       }
+      const username = Array.from(g.usernames)[0] || '';
+      const recoveryEmail = Array.from(g.recoveryEmails)[0] || '';
+      const email = Array.from(g.emails).find(em => em !== recoveryEmail) || Array.from(g.emails)[0] || (recoveryEmail || (username ? username + '@hartv.app' : ''));
+      
+      finalAcc.username = username;
+      finalAcc.email = email;
+      finalAcc.recoveryEmail = recoveryEmail;
+      finalAcc.loginDisplay = username || email;
+      finalAcc.uid = finalAcc.uid || Array.from(g.uids)[0] || ('usr_' + Date.now());
+      return finalAcc;
     });
-
-    const list = Array.from(uniqueMap.values());
 
     // Garantir que Andrew Harris esteja sempre presente na lista como ADMIN MASTER
     const masterUid = (this.currentUser && this.currentUser.uid) ? this.currentUser.uid : 'usr_master_agh';
@@ -1063,17 +1136,8 @@ const AuthManager = {
       });
     }
 
-    // Filtrar completamente qualquer resíduo de teste1 / pepreto018
-    const cleanedList = list.filter(a => {
-      const mail = String(a.email || '').toLowerCase().trim();
-      const usr = String(a.username || '').toLowerCase().trim();
-      const dName = String(a.displayName || '').toLowerCase().trim();
-      if (mail.includes('pepreto') || usr === '123456' || dName === 'teste1') return false;
-      return true;
-    });
-
     // Blindagem definitiva: APENAS E EXCLUSIVAMENTE andrew.g.h.agh@gmail.com pode ter role admin
-    cleanedList.forEach(a => {
+    list.forEach(a => {
       const emailLower = String(a.email || '').toLowerCase().trim();
       const userLower = String(a.username || '').toLowerCase().trim();
       const isMasterAcc = emailLower === masterEmail || userLower === 'admin' || userLower === 'andrew';
@@ -1089,7 +1153,7 @@ const AuthManager = {
       }
     });
 
-    return cleanedList;
+    return list;
   },
 
   // Salvar conta localmente com mesclagem

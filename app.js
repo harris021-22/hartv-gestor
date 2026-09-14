@@ -113,7 +113,7 @@ const App = {
   // Registrar Service Worker
   setupServiceWorker() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=28')
+      navigator.serviceWorker.register('./sw.js?v=29')
         .then((reg) => {
           console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
           reg.update().catch(() => {});
@@ -961,30 +961,23 @@ const App = {
       const accounts = await AuthManager.getAccountsList();
       const currentUser = AuthManager.getUser();
 
-      // Filtrar e eliminar qualquer resquício de teste1 / pepreto018
-      const validAccounts = accounts.filter(acc => {
-        const mail = String(acc.email || '').toLowerCase().trim();
-        const usr = String(acc.username || '').toLowerCase().trim();
-        const dName = String(acc.displayName || '').toLowerCase().trim();
-        if (mail.includes('pepreto') || usr === '123456' || dName === 'teste1') return false;
-        return true;
-      });
+      const validAccounts = accounts;
 
-      const purgeHeader = `
+      const header = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
           <span style="font-size: 0.78rem; color: var(--text-muted);">Total de usuários: <strong>${validAccounts.length}</strong></span>
-          <button class="btn btn-danger" style="font-size: 0.72rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px;" onclick="App.handlePurgeOtherAccounts()">
-            ${this.Icons.trash(13)} <span>Limpar Outras Contas</span>
+          <button class="btn btn-secondary" style="font-size: 0.72rem; padding: 4px 8px; display: inline-flex; align-items: center; gap: 4px;" onclick="App.renderAccountsList()">
+            <span>Atualizar</span>
           </button>
         </div>
       `;
 
       if (validAccounts.length === 0) {
-        container.innerHTML = purgeHeader + '<div style="text-align: center; color: var(--text-dim); padding: 20px;">Nenhum usuário cadastrado além de você.</div>';
+        container.innerHTML = header + '<div style="text-align: center; color: var(--text-dim); padding: 20px;">Nenhum usuário cadastrado além de você.</div>';
         return;
       }
 
-      container.innerHTML = purgeHeader + validAccounts.map(acc => {
+      container.innerHTML = header + validAccounts.map(acc => {
         const masterEmail = 'andrew.g.h.agh@gmail.com';
         const accEmail = String(acc.email || '').toLowerCase().trim();
         // APENAS E EXCLUSIVAMENTE andrew.g.h.agh@gmail.com pode ser Master
