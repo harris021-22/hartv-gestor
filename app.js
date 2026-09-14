@@ -113,7 +113,7 @@ const App = {
   // Registrar Service Worker
   setupServiceWorker() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=29')
+      navigator.serviceWorker.register('./sw.js?v=30')
         .then((reg) => {
           console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
           reg.update().catch(() => {});
@@ -992,7 +992,9 @@ const App = {
 
         const displayName = acc.displayName || 'Sem nome';
         const loginDisplay = acc.loginDisplay || acc.username || acc.email;
-        const passDisplay = acc.plainPassword ? `<span style="font-size: 0.72rem; color: #a7f3d0; background: rgba(16, 185, 129, 0.12); padding: 2px 6px; border-radius: 4px; font-family: monospace; display: inline-flex; align-items: center; gap: 4px;">${this.Icons.key(12)} ${this.escapeHtml(acc.plainPassword)}</span>` : '';
+        const passDisplay = acc.plainPassword 
+          ? `<span style="font-size: 0.74rem; color: #a7f3d0; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 8px; border-radius: 4px; font-family: monospace; display: inline-flex; align-items: center; gap: 5px;" title="Senha do Usuário">${this.Icons.key(12)} <strong>${this.escapeHtml(acc.plainPassword)}</strong></span>` 
+          : (!isMaster ? '<span style="font-size: 0.72rem; color: #f87171; background: rgba(239, 68, 68, 0.12); padding: 2px 6px; border-radius: 4px;">(Senha não definida)</span>' : '');
 
         return `
           <div class="account-item-card">
@@ -1004,9 +1006,10 @@ const App = {
                   : '<span style="font-size: 0.65rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Usuário</span>'}
                 ${isCurrent ? '<span style="font-size: 0.65rem; color: #38bdf8;">(Você)</span>' : ''}
               </div>
-              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px;">
-                <span class="account-email">${this.escapeHtml(loginDisplay)}</span>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+                <span style="font-size: 0.74rem; color: #cbd5e1;">👤 <strong>${this.escapeHtml(loginDisplay)}</strong></span>
                 ${passDisplay}
+                ${acc.recoveryEmail ? `<span style="font-size: 0.7rem; color: var(--text-dim);">(${this.escapeHtml(acc.recoveryEmail)})</span>` : ''}
               </div>
               <div style="margin-top: 4px;">${statusBadge}</div>
             </div>
@@ -1032,7 +1035,7 @@ const App = {
                     <span>Bloquear</span>
                   </button>
                 `}
-                <button class="btn-acc-action btn-acc-delete" title="Excluir Usuário" onclick="App.handleDeleteAccount('${acc.uid}', '${this.escapeJs(displayName)}', '${this.escapeJs(acc.email)}')">
+                <button class="btn-acc-action btn-acc-delete" title="Excluir Usuário" onclick="App.handleDeleteAccount('${acc.uid}', '${this.escapeJs(displayName)}', '${this.escapeJs(acc.email || acc.recoveryEmail || '')}', '${this.escapeJs(acc.username || '')}')">
                   ${this.Icons.trash(13)}
                 </button>
               `}
@@ -1089,11 +1092,11 @@ const App = {
   },
 
   // Excluir conta
-  async handleDeleteAccount(uid, name, email) {
-    if (confirm(`Tem certeza que deseja excluir o usuário "${name}"?`)) {
+  async handleDeleteAccount(uid, name, email, username) {
+    if (confirm(`Tem certeza que deseja excluir permanentemente o usuário "${name}"? Ele não poderá mais acessar o sistema.`)) {
       try {
-        await AuthManager.deleteAccount(uid, email);
-        this.showToast(`Usuário "${name}" excluído.`, 'info');
+        await AuthManager.deleteAccount(uid, email, username);
+        this.showToast(`Usuário "${name}" excluído com sucesso.`, 'info');
         await this.renderAccountsList();
       } catch (err) {
         alert('Aviso: ' + (err.message || err));

@@ -216,10 +216,17 @@ const AuthManager = {
       }
     }
 
-    // Regra: Somente se estiver explicitamente 'blocked', o usuário é impedido.
-    // Como todo usuário agora é criado diretamente pelo Admin Master, o padrão é sempre liberado ('approved')!
+    // Regra estrita: Apenas contas que constem no painel do Master e estejam 'approved' são autorizadas!
+    // Se a conta não existir (foi excluída pelo Master), o status é 'not_found' e o acesso é negado.
+    if (!foundStatus) {
+      return {
+        status: 'not_found',
+        role: 'user'
+      };
+    }
+
     return {
-      status: foundStatus === 'blocked' ? 'blocked' : 'approved',
+      status: foundStatus === 'approved' ? 'approved' : 'blocked',
       role: 'user'
     };
   },
@@ -567,12 +574,21 @@ const AuthManager = {
       }
     }
 
-    // 3. Montar lista de e-mails candidatos para autenticar no Firebase Auth
-    // Prioriza o recoveryEmail (pois foi onde a senha foi redefinida pelo link do Google!)
+    // REGRA DE OURO: Apenas contas cadastradas e ativas no painel do Master podem logar!
+    // Se o usuário não existir no Firestore ou LocalStorage (foi excluído pelo Master), o acesso é sumariamente rejeitado.
+    if (!account) {
+      throw new Error('🚫 Acesso não autorizado. Este usuário não está cadastrado no painel do Administrador Master.');
+    }
+
+    if (account.status === 'blocked') {
+      throw new Error('🚫 Sua conta foi desativada pelo Administrador Master.');
+    }
+
+    // 3. Montar lista de e-mails candidatos para autenticar no Firebase Auth pertencentes a ESTA conta
     const candidateEmails = [];
-    if (account && account.recoveryEmail) candidateEmails.push(account.recoveryEmail.toLowerCase());
-    if (account && account.email) candidateEmails.push(account.email.toLowerCase());
-    if (isEmail) candidateEmails.push(cleanLower);
+    if (account.recoveryEmail) candidateEmails.push(account.recoveryEmail.toLowerCase());
+    if (account.email) candidateEmails.push(account.email.toLowerCase());
+    if (account.username) candidateEmails.push(`${account.username.toLowerCase()}@hartv.app`);
     if (cleanUsername) candidateEmails.push(`${cleanUsername}@hartv.app`);
 
     const uniqueEmails = [...new Set(candidateEmails.filter(e => e && e.includes('@')))];
@@ -647,11 +663,11 @@ const AuthManager = {
         const userUid = firebaseUid;
 
         const check = await this.checkUserApprovalStatus(userUid, firebaseUser.email);
-        if (check.status === 'blocked') {
+        if (check.status !== 'approved') {
           await firebase.auth().signOut().catch(() => {});
           this.currentUser = null;
           localStorage.removeItem(this.CURRENT_USER_KEY);
-          throw new Error('🚫 Sua conta foi desativada pelo administrador.');
+          throw new Error('🚫 Acesso não autorizado. Este usuário não consta como ativo no painel do Administrador Master.');
         }
 
         // Sincronizar nova senha e UID no Firestore system_accounts (apenas no documento canônico)
@@ -1273,11 +1289,53 @@ const AuthManager = {
     };
   },
 
-  // EXCLUIR UMA CONTA ESPECÍFICA
-  async deleteAccount(uid, email) {
-    if (!uid && !email) return false;
+  // EXCLUIR UMA CONTA ESPECÍFICA (FIREBASE AUTH, FIRESTORE E LOCALSTORAGE)
+  async deleteAccount(uid, email, username) {
+    if (!uid && !email && !username) return false;
     const cleanEmail = email ? String(email).trim().toLowerCase() : (uid && String(uid).includes('@') ? String(uid).trim().toLowerCase() : null);
 
+    // 1. Localizar dados completos da conta antes de excluir para limpar credenciais
+    const accounts = this.getLocalAccounts();
+    const targetAcc = accounts.find(a => 
+      (uid && (a.uid === uid || a.docId === uid)) ||
+      (cleanEmail && ((a.email && a.email.toLowerCase() === cleanEmail) || (a.recoveryEmail && a.recoveryEmail.toLowerCase() === cleanEmail))) ||
+      (username && a.username && a.username.toLowerCase() === String(username).toLowerCase().trim())
+    );
+
+    const targetUser = (username || targetAcc?.username || '').toLowerCase().trim();
+    const targetPass = targetAcc?.plainPassword || '';
+    const candidateEmails = [...new Set([
+      cleanEmail,
+      targetAcc?.email?.toLowerCase(),
+      targetAcc?.recoveryEmail?.toLowerCase(),
+      targetUser ? `${targetUser}@hartv.app` : null
+    ].filter(e => e && e.includes('@')))];
+
+    // 2. Excluir no Firebase Auth via REST API para revogar acesso permanentemente
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && firebaseConfig.apiKey && targetPass) {
+      for (const candEmail of candidateEmails) {
+        try {
+          const sRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: candEmail, password: targetPass, returnSecureToken: true })
+          });
+          const sData = await sRes.json();
+          if (sRes.ok && sData.idToken) {
+            await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${firebaseConfig.apiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ idToken: sData.idToken })
+            });
+            console.log(`[Auth] Usuário ${candEmail} excluído permanentemente do Firebase Auth.`);
+          }
+        } catch (e) {
+          console.warn(`[Auth] Aviso ao excluir conta do Firebase Auth para ${candEmail}:`, e);
+        }
+      }
+    }
+
+    // 3. Excluir completamente no Firestore
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       const db = firebase.firestore();
       try {
@@ -1289,21 +1347,40 @@ const AuthManager = {
         }
         if (cleanEmail) {
           await db.collection('system_accounts').doc(cleanEmail).delete().catch(() => {});
-          const qSnap = await db.collection('system_accounts').where('email', '==', cleanEmail).get();
+        }
+        if (targetUser) {
+          await db.collection('system_accounts').doc(targetUser).delete().catch(() => {});
+          const qUser = await db.collection('system_accounts').where('username', '==', targetUser).get();
+          qUser.forEach(d => d.ref.delete().catch(() => {}));
+        }
+        for (const candEmail of candidateEmails) {
+          const qSnap = await db.collection('system_accounts').where('email', '==', candEmail).get();
           qSnap.forEach(d => d.ref.delete().catch(() => {}));
+          const qRec = await db.collection('system_accounts').where('recoveryEmail', '==', candEmail).get();
+          qRec.forEach(d => d.ref.delete().catch(() => {}));
         }
       } catch (e) {
-        console.warn('Erro ao deletar no Firestore:', e);
+        console.warn('[Auth] Erro ao deletar no Firestore:', e);
       }
     }
 
-    const accounts = this.getLocalAccounts();
+    // 4. Excluir no LocalStorage
     const filtered = accounts.filter(a => {
       if (uid && a.uid && String(a.uid) === String(uid)) return false;
       if (cleanEmail && a.email && a.email.toLowerCase() === cleanEmail) return false;
+      if (cleanEmail && a.recoveryEmail && a.recoveryEmail.toLowerCase() === cleanEmail) return false;
+      if (targetUser && a.username && a.username.toLowerCase() === targetUser) return false;
       return true;
     });
     this.saveLocalAccounts(filtered);
+
+    // Limpar cache local do usuário excluído
+    if (uid) {
+      try {
+        localStorage.removeItem(`hartv_clients_${uid}`);
+        localStorage.removeItem(`hartv_settings_${uid}`);
+      } catch (e) {}
+    }
     return true;
   },
 
@@ -1417,3 +1494,7 @@ const AuthManager = {
     }
   }
 };
+
+if (typeof window !== 'undefined') {
+  window.AuthManager = AuthManager;
+}
