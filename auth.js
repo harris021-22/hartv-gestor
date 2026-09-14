@@ -10,8 +10,7 @@ const AuthManager = {
 
   // E-mail do Administrador Master Principal (ÚNICO QUE PODE SER ADMIN)
   MASTER_ADMIN_EMAILS: [
-    'andrew.g.h.agh@gmail.com',
-    'pepreto018@gmail.com'
+    'andrew.g.h.agh@gmail.com'
   ],
 
   isMasterEmail(email) {
@@ -34,16 +33,30 @@ const AuthManager = {
             status: 'approved'
           };
         } else {
-          // Usuários comuns NUNCA podem ter role admin
+          // Usuários comuns NUNCA podem ter role admin (apenas andrew.g.h.agh@gmail.com)
           this.currentUser = {
             ...parsed,
             role: 'user'
           };
+          localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
           if (this.currentUser.status !== 'approved') {
             this.currentUser = null;
             localStorage.removeItem(this.CURRENT_USER_KEY);
           }
         }
+      }
+
+      // Sanitizar contas locais para garantir que apenas andrew.g.h.agh@gmail.com seja admin
+      const localAccs = this.getLocalAccounts();
+      let hasChange = false;
+      localAccs.forEach(acc => {
+        if (!this.isMasterEmail(acc.email) && acc.role === 'admin') {
+          acc.role = 'user';
+          hasChange = true;
+        }
+      });
+      if (hasChange) {
+        this.saveLocalAccounts(localAccs);
       }
     } catch (e) {
       console.error('Erro ao ler sessão salva:', e);
@@ -1033,7 +1046,7 @@ const AuthManager = {
 
     // Garantir que Andrew Harris esteja sempre presente na lista como ADMIN MASTER
     const masterUid = (this.currentUser && this.currentUser.uid) ? this.currentUser.uid : 'usr_master_agh';
-    const hasMaster = list.some(a => a.email && (a.email.toLowerCase() === masterEmail || a.email.toLowerCase() === 'pepreto018@gmail.com'));
+    const hasMaster = list.some(a => a.email && a.email.toLowerCase() === masterEmail);
     if (!hasMaster) {
       list.unshift({
         uid: masterUid,
