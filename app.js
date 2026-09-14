@@ -13,6 +13,83 @@ const App = {
   editingClientId: null,
   deferredInstallPrompt: null,
 
+  // Sistema de Ícones Vetoriais SVG (Lucide)
+  Icons: {
+    eye(size = 16) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    },
+    eyeOff(size = 16) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>`;
+    },
+    copy(size = 14) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`;
+    },
+    check(size = 14) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    },
+    whatsapp(size = 16) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
+    },
+    calendar(size = 14) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>`;
+    },
+    plus30(size = 15) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6"/><path d="M21.34 15.57a10 10 0 1 1-.57-8.38l.67-1.19"/></svg>`;
+    },
+    edit(size = 15) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`;
+    },
+    trash(size = 15) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
+    },
+    sparkles(size = 16) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg>`;
+    },
+    server(size = 13) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>`;
+    },
+    smartphone(size = 13) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" x2="12.01" y1="18" y2="18"/></svg>`;
+    },
+    users(size = 16) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
+    },
+    bell(size = 16) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`;
+    },
+    database(size = 16) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>`;
+    },
+    settings(size = 16) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+    },
+    logout(size = 16) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>`;
+    },
+    plus(size = 16) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>`;
+    },
+    menu(size = 20) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>`;
+    },
+    key(size = 14) {
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>`;
+    }
+  },
+
+  // Alternar visibilidade de input de senha em formulários
+  toggleInputPassword(inputId, btnEl) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const isPass = input.type === 'password';
+    input.type = isPass ? 'text' : 'password';
+    if (btnEl) {
+      btnEl.innerHTML = isPass ? this.Icons.eye(16) : this.Icons.eyeOff(16);
+      btnEl.title = isPass ? 'Ocultar Senha' : 'Ver Senha';
+      btnEl.setAttribute('aria-label', isPass ? 'Ocultar senha' : 'Ver senha');
+    }
+  },
+
   // Inicialização
   init() {
     this.setupEventListeners();
@@ -35,7 +112,7 @@ const App = {
   // Registrar Service Worker
   setupServiceWorker() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=20')
+      navigator.serviceWorker.register('./sw.js?v=21')
         .then((reg) => {
           console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
           reg.update().catch(() => {});
@@ -686,7 +763,7 @@ const App = {
       // Preencher caixa do modal de dados de acesso
       const summaryBox = document.getElementById('userCreatedSummaryBox');
       if (summaryBox) {
-        summaryBox.textContent = `👤 Usuário: ${loginDisplay}\n🔑 Senha: ${pass}\n🌐 Painel: ${appUrl}`;
+        summaryBox.textContent = `Usuário: ${loginDisplay}\nSenha: ${pass}\nPainel: ${appUrl}`;
       }
 
       // Limpar formulário de criação
@@ -698,14 +775,14 @@ const App = {
       const modal = document.getElementById('userCreatedModal');
       if (modal) modal.classList.add('open');
 
-      this.showToast(`✅ Usuário "${loginDisplay}" criado e liberado com sucesso!`, 'success');
+      this.showToast(`Usuário "${loginDisplay}" criado e liberado com sucesso!`, 'success');
       await this.renderAccountsList();
     } catch (err) {
       alert('Erro ao criar usuário: ' + (err.message || err));
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtn || '<span>✨ Criar e Liberar Usuário</span>';
+        submitBtn.innerHTML = originalBtn || '<span>Criar e Liberar Usuário</span>';
       }
     }
   },
@@ -714,11 +791,11 @@ const App = {
   handleCopyCreatedUser() {
     if (!this.lastCreatedUserData) return;
     const { name, login, password, url } = this.lastCreatedUserData;
-    const text = `*Seu Acesso ao HarTv Gestor* 🚀\n👤 *Usuário:* ${login}\n🔑 *Senha:* ${password}\n🌐 *Acesse por aqui:* ${url}`;
+    const text = `*Seu Acesso ao HarTv Gestor*\n*Usuário:* ${login}\n*Senha:* ${password}\n*Acesse por aqui:* ${url}`;
     
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(() => {
-        this.showToast('📋 Dados de acesso copiados para a área de transferência!', 'success');
+        this.showToast('Dados de acesso copiados para a área de transferência!', 'success');
       }).catch(() => {
         prompt('Copie os dados abaixo (Ctrl+C):', text);
       });
@@ -731,7 +808,7 @@ const App = {
   handleSendCreatedUserWhatsApp() {
     if (!this.lastCreatedUserData) return;
     const { name, login, password, url } = this.lastCreatedUserData;
-    const text = `Olá ${name}! Aqui está o seu acesso oficial ao painel do HarTv Gestor: 🚀\n\n👤 *Usuário:* ${login}\n🔑 *Senha:* ${password}\n🌐 *Link de Acesso:* ${url}\n\nQualquer dúvida, estou à disposição!`;
+    const text = `Olá ${name}! Aqui está o seu acesso oficial ao painel do HarTv Gestor:\n\n*Usuário:* ${login}\n*Senha:* ${password}\n*Link de Acesso:* ${url}\n\nQualquer dúvida, estou à disposição!`;
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank');
   },
@@ -739,15 +816,15 @@ const App = {
   // Copiar credenciais de um usuário já existente na lista
   handleCopyUserCredentials(name, login, password) {
     const appUrl = window.location.origin && window.location.origin !== 'null' ? window.location.origin : 'https://hartv-gestor.web.app';
-    let text = `*Seu Acesso ao HarTv Gestor* 🚀\n👤 *Usuário:* ${login}\n`;
+    let text = `*Seu Acesso ao HarTv Gestor*\n*Usuário:* ${login}\n`;
     if (password) {
-      text += `🔑 *Senha:* ${password}\n`;
+      text += `*Senha:* ${password}\n`;
     }
-    text += `🌐 *Acesse por aqui:* ${appUrl}`;
+    text += `*Acesse por aqui:* ${appUrl}`;
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(() => {
-        this.showToast('📋 Dados de acesso copiados!', 'success');
+        this.showToast('Dados de acesso copiados!', 'success');
       }).catch(() => {
         prompt('Copie os dados abaixo (Ctrl+C):', text);
       });
@@ -785,18 +862,18 @@ const App = {
     try {
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span>⏳ Salvando...</span>';
+        submitBtn.innerHTML = '<span>Salvando...</span>';
       }
       await AuthManager.changeUserPasswordByAdmin(uid, email, newPass, oldPass);
       this.closeAllModals();
-      this.showToast('✅ Nova senha salva com sucesso!', 'success');
+      this.showToast('Nova senha salva com sucesso!', 'success');
       await this.renderAccountsList();
     } catch (err) {
       alert('Erro ao alterar senha: ' + (err.message || err));
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '<span>💾 Salvar Nova Senha</span>';
+        submitBtn.innerHTML = '<span>Salvar Nova Senha</span>';
       }
     }
   },
@@ -815,8 +892,8 @@ const App = {
       const purgeHeader = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
           <span style="font-size: 0.78rem; color: var(--text-muted);">Total de usuários: <strong>${accounts.length}</strong></span>
-          <button class="btn btn-danger" style="font-size: 0.72rem; padding: 5px 10px;" onclick="App.handlePurgeOtherAccounts()">
-            <span>🗑️ Limpar Outras Contas</span>
+          <button class="btn btn-danger" style="font-size: 0.72rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px;" onclick="App.handlePurgeOtherAccounts()">
+            ${this.Icons.trash(13)} <span>Limpar Outras Contas</span>
           </button>
         </div>
       `;
@@ -830,19 +907,19 @@ const App = {
         const isMaster = AuthManager.isMasterEmail(acc.email);
         const isCurrent = isMaster || (currentUser && currentUser.uid === acc.uid) || (currentUser && currentUser.email && currentUser.email.toLowerCase() === acc.email.toLowerCase());
         const status = acc.status || 'approved';
-        let statusBadge = '<span class="status-pill approved">🟢 Ativo</span>';
-        if (status === 'blocked') statusBadge = '<span class="status-pill blocked">🔴 Bloqueado</span>';
+        let statusBadge = '<span class="status-pill approved">Ativo</span>';
+        if (status === 'blocked') statusBadge = '<span class="status-pill blocked">Bloqueado</span>';
 
         const displayName = acc.displayName || 'Sem nome';
         const loginDisplay = acc.loginDisplay || acc.username || acc.email;
-        const passDisplay = acc.plainPassword ? `<span style="font-size: 0.72rem; color: #a7f3d0; background: rgba(16, 185, 129, 0.12); padding: 2px 6px; border-radius: 4px; font-family: monospace;">🔑 ${this.escapeHtml(acc.plainPassword)}</span>` : '';
+        const passDisplay = acc.plainPassword ? `<span style="font-size: 0.72rem; color: #a7f3d0; background: rgba(16, 185, 129, 0.12); padding: 2px 6px; border-radius: 4px; font-family: monospace; display: inline-flex; align-items: center; gap: 4px;">${this.Icons.key(12)} ${this.escapeHtml(acc.plainPassword)}</span>` : '';
 
         return `
           <div class="account-item-card">
             <div class="account-info">
               <div class="account-name-row">
                 <span class="account-name">${this.escapeHtml(displayName)}</span>
-                ${isMaster ? '<span style="font-size: 0.65rem; background: rgba(139, 92, 246, 0.2); color: #c084fc; padding: 2px 6px; border-radius: 4px; font-weight: 700;">ADMIN MASTER 👑</span>' : ''}
+                ${isMaster ? '<span style="font-size: 0.65rem; background: rgba(139, 92, 246, 0.2); color: #c084fc; padding: 2px 6px; border-radius: 4px; font-weight: 700;">ADMIN MASTER</span>' : ''}
                 ${isCurrent ? '<span style="font-size: 0.65rem; color: #38bdf8;">(Você)</span>' : ''}
               </div>
               <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px;">
@@ -855,26 +932,26 @@ const App = {
             <div class="account-actions-group" style="flex-wrap: wrap;">
               ${isMaster ? `
                 <span style="font-size: 0.72rem; color: #c084fc; font-weight: 700; background: rgba(139, 92, 246, 0.15); padding: 5px 12px; border-radius: 9999px; border: 1px solid rgba(139, 92, 246, 0.35);">
-                  👑 Conta Master
+                  Conta Master
                 </span>
               ` : `
                 <button class="btn-acc-action btn-acc-approve" title="Copiar Usuário e Senha para enviar ao cliente" onclick="App.handleCopyUserCredentials('${this.escapeJs(displayName)}', '${this.escapeJs(loginDisplay)}', '${this.escapeJs(acc.plainPassword || '')}')">
-                  <span>📋 Copiar</span>
+                  ${this.Icons.copy(13)} <span>Copiar</span>
                 </button>
                 <button class="btn-acc-action btn-secondary" title="Alterar Senha" onclick="App.openChangePasswordModal('${acc.uid}', '${this.escapeJs(displayName)}', '${this.escapeJs(acc.email)}', '${this.escapeJs(acc.plainPassword || '')}')" style="padding: 6px 8px; font-size: 0.72rem;">
-                  <span>🔑 Senha</span>
+                  ${this.Icons.key(13)} <span>Senha</span>
                 </button>
                 ${status === 'blocked' ? `
                   <button class="btn-acc-action btn-acc-approve" title="Desbloquear acesso" onclick="App.handleApproveAccount('${acc.uid}', '${this.escapeJs(displayName)}', '${this.escapeJs(acc.email)}')">
-                    <span>🟢 Liberar</span>
+                    <span>Liberar</span>
                   </button>
                 ` : `
                   <button class="btn-acc-action btn-acc-block" title="Bloquear acesso temporariamente" onclick="App.handleBlockAccount('${acc.uid}', '${this.escapeJs(displayName)}', '${this.escapeJs(acc.email)}')">
-                    <span>🚫 Bloquear</span>
+                    <span>Bloquear</span>
                   </button>
                 `}
                 <button class="btn-acc-action btn-acc-delete" title="Excluir Usuário" onclick="App.handleDeleteAccount('${acc.uid}', '${this.escapeJs(displayName)}', '${this.escapeJs(acc.email)}')">
-                  <span>🗑️</span>
+                  ${this.Icons.trash(13)}
                 </button>
               `}
             </div>
@@ -1202,8 +1279,8 @@ const App = {
               ${this.escapeHtml(client.name)}
             </div>
             <div class="client-meta-info">
-              ${client.server ? `<span class="tag-badge">🖥️ ${this.escapeHtml(client.server)}</span>` : ''}
-              ${client.app ? `<span class="tag-badge">📱 ${this.escapeHtml(client.app)}</span>` : ''}
+              ${client.server ? `<span class="tag-badge" style="display: inline-flex; align-items: center; gap: 4px;">${this.Icons.server(13)} ${this.escapeHtml(client.server)}</span>` : ''}
+              ${client.app ? `<span class="tag-badge" style="display: inline-flex; align-items: center; gap: 4px;">${this.Icons.smartphone(13)} ${this.escapeHtml(client.app)}</span>` : ''}
             </div>
           </div>
           <span class="status-badge ${statusInfo.class}">
@@ -1217,24 +1294,24 @@ const App = {
             <span class="cred-label">URL:</span>
             <div class="cred-value-wrap">
               <span class="cred-val" title="${this.escapeHtml(client.url || '')}">${this.escapeHtml(client.url || 'Não informada')}</span>
-              ${client.url ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.url)}', 'URL')" title="Copiar URL" aria-label="Copiar URL de conexão">📋</button>` : ''}
+              ${client.url ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.url)}', 'URL', this)" title="Copiar URL" aria-label="Copiar URL de conexão">${this.Icons.copy(14)}</button>` : ''}
             </div>
           </div>
 
           <div class="credential-item">
             <span class="cred-label">Usuário:</span>
             <div class="cred-value-wrap">
-              <span class="cred-val" style="color: #38bdf8; font-weight: 600;">${this.escapeHtml(client.username || '---')}</span>
-              ${client.username ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.username)}', 'Usuário')" title="Copiar Usuário" aria-label="Copiar usuário de acesso">📋</button>` : ''}
+              <span class="cred-val" style="color: #60a5fa; font-weight: 600;">${this.escapeHtml(client.username || '---')}</span>
+              ${client.username ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.username)}', 'Usuário', this)" title="Copiar Usuário" aria-label="Copiar usuário de acesso">${this.Icons.copy(14)}</button>` : ''}
             </div>
           </div>
 
           <div class="credential-item">
             <span class="cred-label">Senha:</span>
             <div class="cred-value-wrap">
-              <span class="cred-val" id="pwd-${client.id}" style="color: #a855f7; font-weight: 600;">••••••</span>
-              <button class="copy-mini-btn" onclick="App.togglePassword('${client.id}', '${this.escapeJs(client.password || '')}')" title="Mostrar/Ocultar Senha" aria-label="Mostrar ou ocultar senha">👁️</button>
-              ${client.password ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.password)}', 'Senha')" title="Copiar Senha" aria-label="Copiar senha">📋</button>` : ''}
+              <span class="cred-val" id="pwd-${client.id}" style="color: #93c5fd; font-weight: 600; letter-spacing: 0.08em;">••••••••</span>
+              <button class="copy-mini-btn" id="pwd-btn-${client.id}" onclick="App.togglePassword('${client.id}', '${this.escapeJs(client.password || '')}', this)" title="Mostrar Senha" aria-label="Mostrar ou ocultar senha">${this.Icons.eyeOff(15)}</button>
+              ${client.password ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.password)}', 'Senha', this)" title="Copiar Senha" aria-label="Copiar senha">${this.Icons.copy(14)}</button>` : ''}
             </div>
           </div>
 
@@ -1243,7 +1320,7 @@ const App = {
             <span class="cred-label">MAC:</span>
             <div class="cred-value-wrap">
               <span class="cred-val" style="color: #fbbf24; font-weight: 600; font-family: monospace;">${this.escapeHtml(client.mac)}</span>
-              <button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.mac)}', 'MAC')" title="Copiar MAC" aria-label="Copiar endereço MAC">📋</button>
+              <button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.mac)}', 'MAC', this)" title="Copiar MAC" aria-label="Copiar endereço MAC">${this.Icons.copy(14)}</button>
             </div>
           </div>` : ''}
 
@@ -1252,7 +1329,7 @@ const App = {
             <span class="cred-label">Chave / Key:</span>
             <div class="cred-value-wrap">
               <span class="cred-val" style="color: #34d399; font-weight: 600;">${this.escapeHtml(client.deviceKey || client.key)}</span>
-              <button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.deviceKey || client.key)}', 'Chave')" title="Copiar Chave" aria-label="Copiar chave do dispositivo">📋</button>
+              <button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.deviceKey || client.key)}', 'Chave', this)" title="Copiar Chave" aria-label="Copiar chave do dispositivo">${this.Icons.copy(14)}</button>
             </div>
           </div>` : ''}
 
@@ -1260,7 +1337,7 @@ const App = {
             <span class="cred-label">WhatsApp:</span>
             <div class="cred-value-wrap">
               <span class="cred-val">${this.escapeHtml(client.whatsapp || 'Não informado')}</span>
-              ${client.whatsapp ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.whatsapp)}', 'WhatsApp')" title="Copiar WhatsApp" aria-label="Copiar número do WhatsApp">📋</button>` : ''}
+              ${client.whatsapp ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.whatsapp)}', 'WhatsApp', this)" title="Copiar WhatsApp" aria-label="Copiar número do WhatsApp">${this.Icons.copy(14)}</button>` : ''}
             </div>
           </div>
         </div>
@@ -1268,7 +1345,7 @@ const App = {
         <!-- Linha de Vencimento e Preço -->
         <div class="card-details-row">
           <div class="expiration-info">
-            <span>📅 Vencimento:</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;">${this.Icons.calendar(14)} Vencimento:</span>
             <span class="exp-date">${formattedDate}</span>
           </div>
           <div class="price-tag">
@@ -1279,19 +1356,19 @@ const App = {
         <!-- Ações Rápidas -->
         <div class="card-actions">
           <button class="action-btn whatsapp-btn" onclick="App.openWhatsAppMenu('${client.id}')" aria-label="Abrir menu de WhatsApp para ${this.escapeHtml(client.name)}">
-            <span>💬</span>
+            ${this.Icons.whatsapp(18)}
             <span>WhatsApp</span>
           </button>
           <button class="action-btn renew-btn" onclick="App.handleQuickRenew('${client.id}')" title="Adicionar 30 dias de sinal" aria-label="Renovar assinatura por mais 30 dias">
-            <span>⚡</span>
+            ${this.Icons.plus30(17)}
             <span>+30 Dias</span>
           </button>
           <button class="action-btn" onclick="App.openClientModal('${client.id}')" aria-label="Editar dados de ${this.escapeHtml(client.name)}">
-            <span>✏️</span>
+            ${this.Icons.edit(16)}
             <span>Editar</span>
           </button>
           <button class="action-btn danger-action" onclick="App.handleDeleteClient('${client.id}', '${this.escapeJs(client.name)}')" aria-label="Excluir cliente ${this.escapeHtml(client.name)}">
-            <span>🗑️</span>
+            ${this.Icons.trash(16)}
             <span>Excluir</span>
           </button>
         </div>
@@ -1306,22 +1383,33 @@ const App = {
   },
 
   // Alternar visualização da senha
-  togglePassword(clientId, realPassword) {
+  togglePassword(clientId, realPassword, btnEl) {
     const el = document.getElementById(`pwd-${clientId}`);
     if (!el) return;
-    if (el.textContent === '••••••') {
+    const btn = btnEl || document.getElementById(`pwd-btn-${clientId}`);
+    const isMasked = el.textContent === '••••••••' || el.textContent === '••••••';
+    if (isMasked) {
       el.textContent = realPassword || '---';
+      if (btn) {
+        btn.innerHTML = this.Icons.eye(15);
+        btn.title = 'Ocultar Senha';
+        btn.setAttribute('aria-label', 'Ocultar senha');
+      }
     } else {
-      el.textContent = '••••••';
+      el.textContent = '••••••••';
+      if (btn) {
+        btn.innerHTML = this.Icons.eyeOff(15);
+        btn.title = 'Mostrar Senha';
+        btn.setAttribute('aria-label', 'Mostrar senha');
+      }
     }
   },
 
-  // Copiar para área de transferência
-  async copyToClipboard(text, label = 'Texto') {
+  // Copiar para área de transferência com micro-interação visual
+  async copyToClipboard(text, label = 'Texto', btnEl = null) {
     if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
-      this.showToast(`${label} copiado!`, 'info');
     } catch (e) {
       // Fallback
       const textarea = document.createElement('textarea');
@@ -1330,8 +1418,18 @@ const App = {
       textarea.select();
       document.execCommand('copy');
       document.body.removeChild(textarea);
-      this.showToast(`${label} copiado!`, 'info');
     }
+
+    if (btnEl) {
+      const originalHtml = btnEl.innerHTML;
+      btnEl.innerHTML = this.Icons.check(14);
+      btnEl.classList.add('copied');
+      setTimeout(() => {
+        btnEl.innerHTML = originalHtml;
+        btnEl.classList.remove('copied');
+      }, 1500);
+    }
+    this.showToast(`${label} copiado!`, 'info');
   },
 
   // Renovação Rápida de +30 Dias

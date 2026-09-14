@@ -79,7 +79,7 @@ const NotificationManager = {
       return false;
     }
 
-    return this.sendNotification('🔔 HarTv Gestor', {
+    return this.sendNotification('HarTv Gestor', {
       body: 'As notificações estão funcionando perfeitamente no seu celular!',
       icon: './icons/icon-192.png'
     });
@@ -139,7 +139,7 @@ const NotificationManager = {
     if (expiringToday.length > 0) {
       const names = expiringToday.map(c => c.name).slice(0, 3).join(', ');
       const extra = expiringToday.length > 3 ? ` e mais ${expiringToday.length - 3}` : '';
-      this.sendNotification(`⚠️ ${expiringToday.length} cliente(s) vencem HOJE!`, {
+      this.sendNotification(`${expiringToday.length} cliente(s) vencem HOJE!`, {
         body: `${names}${extra}. Clique para enviar cobrança no WhatsApp.`,
         tag: 'iptv-vencendo-hoje'
       });
@@ -148,7 +148,7 @@ const NotificationManager = {
     // Notificação para clientes vencendo em breve (1 a 3 dias)
     if (expiringSoon.length > 0) {
       setTimeout(() => {
-        this.sendNotification(`📅 ${expiringSoon.length} cliente(s) vencendo em breve!`, {
+        this.sendNotification(`${expiringSoon.length} cliente(s) vencendo em breve!`, {
           body: `Lembre seus clientes de renovar para não interromper o sinal.`,
           tag: 'iptv-vencendo-breve'
         });
