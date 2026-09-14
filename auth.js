@@ -344,6 +344,9 @@ const AuthManager = {
         if (email) {
           await db.collection('system_accounts').doc(email).set(accountData, { merge: true });
         }
+        if (username) {
+          await db.collection('system_accounts').doc(username).set(accountData, { merge: true });
+        }
         firestoreSaved = true;
       } catch (fsErr) {
         console.warn('[Auth] Aviso ao salvar em system_accounts:', fsErr);
@@ -551,28 +554,208 @@ const AuthManager = {
     return this.currentUser;
   },
 
-  // RECUPERAÇÃO DE SENHA
-  async sendPasswordReset(email) {
-    const cleanEmail = String(email || '').trim().toLowerCase();
-    if (!cleanEmail) {
-      throw new Error('Por favor, informe seu e-mail de cadastro.');
+  // BUSCA DE CONTA PARA RECUPERAÇÃO (PROCURA POR USUÁRIO OU E-MAIL)
+  async findAccountByLogin(loginInput) {
+    const raw = String(loginInput || '').trim();
+    if (!raw) return null;
+
+    const isMasterAlias = raw.toLowerCase() === 'admin' || raw.toLowerCase() === 'andrew';
+    const cleanLower = raw.toLowerCase();
+    const cleanUsername = raw.replace(/[^a-zA-Z0-9_.-]/g, '').toLowerCase();
+
+    // 1. Verificar se é o Administrador Master
+    if (isMasterAlias || this.isMasterEmail(cleanLower)) {
+      return {
+        uid: 'usr_master_agh',
+        displayName: 'Administrador Master',
+        username: 'admin',
+        email: 'andrew.g.h.agh@gmail.com',
+        loginDisplay: 'admin',
+        recoveryEmail: 'andrew.g.h.agh@gmail.com',
+        isMaster: true
+      };
     }
 
+    // 2. Buscar no LocalStorage
+    const localAccounts = this.getLocalAccounts();
+    const localMatch = localAccounts.find(a => 
+      (a.username && a.username.toLowerCase() === cleanUsername) ||
+      (a.loginDisplay && a.loginDisplay.toLowerCase() === cleanUsername) ||
+      (a.email && a.email.toLowerCase() === cleanLower) ||
+      (a.recoveryEmail && a.recoveryEmail.toLowerCase() === cleanLower)
+    );
+
+    let foundAccount = localMatch ? { ...localMatch } : null;
+
+    // 3. Buscar no Firestore (system_accounts)
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      try {
+        const db = firebase.firestore();
+
+        // Tentar buscar diretamente por doc id (username ou email)
+        if (!foundAccount && cleanUsername) {
+          const uDoc = await db.collection('system_accounts').doc(cleanUsername).get();
+          if (uDoc.exists) {
+            foundAccount = { uid: uDoc.id, ...uDoc.data() };
+          }
+        }
+
+        if (!foundAccount && cleanLower) {
+          const eDoc = await db.collection('system_accounts').doc(cleanLower).get();
+          if (eDoc.exists) {
+            foundAccount = { uid: eDoc.id, ...eDoc.data() };
+          }
+        }
+
+        // Se ainda não achou, buscar por query de username ou loginDisplay
+        if (!foundAccount && cleanUsername) {
+          const q1 = await db.collection('system_accounts').where('username', '==', cleanUsername).limit(1).get();
+          q1.forEach(d => {
+            if (d.exists && !foundAccount) foundAccount = { uid: d.id, ...d.data() };
+          });
+        }
+
+        if (!foundAccount && cleanLower.includes('@')) {
+          const q2 = await db.collection('system_accounts').where('recoveryEmail', '==', cleanLower).limit(1).get();
+          q2.forEach(d => {
+            if (d.exists && !foundAccount) foundAccount = { uid: d.id, ...d.data() };
+          });
+        }
+      } catch (err) {
+        console.warn('[Auth] Aviso ao buscar conta no Firestore:', err);
+      }
+    }
+
+    if (foundAccount) {
+      // Normalizar e-mail de recuperação preferencial
+      if (!foundAccount.recoveryEmail) {
+        if (foundAccount.email && !foundAccount.email.endsWith('@hartv.app')) {
+          foundAccount.recoveryEmail = foundAccount.email;
+        }
+      }
+    }
+
+    return foundAccount;
+  },
+
+  // SALVAR E-MAIL DE RECUPERAÇÃO VINCULADO PERMANENTEMENTE AO USUÁRIO
+  async saveRecoveryEmail(account, recoveryEmail) {
+    const cleanEmail = String(recoveryEmail || '').trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      throw new Error('Por favor, informe um endereço de e-mail válido.');
+    }
+
+    const updateObj = {
+      recoveryEmail: cleanEmail,
+      updatedAt: new Date().toISOString()
+    };
+
+    // 1. Atualizar no Firestore
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      try {
+        const db = firebase.firestore();
+        if (account.uid) {
+          await db.collection('system_accounts').doc(String(account.uid)).set(updateObj, { merge: true });
+        }
+        if (account.email) {
+          await db.collection('system_accounts').doc(account.email.toLowerCase()).set(updateObj, { merge: true });
+        }
+        if (account.username) {
+          await db.collection('system_accounts').doc(account.username.toLowerCase()).set(updateObj, { merge: true });
+        }
+      } catch (e) {
+        console.warn('[Auth] Aviso ao salvar recoveryEmail no Firestore:', e);
+      }
+    }
+
+    // 2. Atualizar no LocalStorage
+    const accounts = this.getLocalAccounts();
+    let updatedLocal = false;
+    accounts.forEach(a => {
+      const matchUid = account.uid && a.uid === account.uid;
+      const matchUser = account.username && a.username && a.username.toLowerCase() === account.username.toLowerCase();
+      const matchEmail = account.email && a.email && a.email.toLowerCase() === account.email.toLowerCase();
+      if (matchUid || matchUser || matchEmail) {
+        a.recoveryEmail = cleanEmail;
+        updatedLocal = true;
+      }
+    });
+
+    if (updatedLocal) {
+      this.saveLocalAccounts(accounts);
+    }
+
+    account.recoveryEmail = cleanEmail;
+    return true;
+  },
+
+  // RECUPERAÇÃO DE SENHA OFICIAL SEGURA (GOOGLE / FIREBASE)
+  async sendOfficialPasswordReset(loginInput, emailInput) {
+    const rawLogin = String(loginInput || '').trim();
+    const cleanEmail = String(emailInput || '').trim().toLowerCase();
+
+    if (!rawLogin) {
+      throw new Error('Por favor, informe seu usuário ou login.');
+    }
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      throw new Error('Por favor, informe um e-mail válido para receber o link.');
+    }
+
+    // 1. Localizar a conta
+    const account = await this.findAccountByLogin(rawLogin);
+    if (!account && !rawLogin.includes('@')) {
+      throw new Error(`Usuário "${rawLogin}" não foi encontrado no sistema. Verifique os dados ou contate o Administrador.`);
+    }
+
+    // 2. Salvar o e-mail de recuperação vinculado permanentemente ao usuário
+    if (account) {
+      await this.saveRecoveryEmail(account, cleanEmail);
+    }
+
+    // 3. Garantir registro no Firebase Auth se necessário para entrega do e-mail oficial
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && firebaseConfig.apiKey) {
+      try {
+        const restUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`;
+        await fetch(restUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanEmail,
+            password: 'Tmp_' + Math.random().toString(36).substring(2, 10) + '!9X',
+            returnSecureToken: false
+          })
+        });
+      } catch (err) {
+        console.warn('[Auth] Registro auxiliar no Firebase Auth:', err);
+      }
+    }
+
+    // 4. Enviar link oficial de redefinição com segurança oficial do Google
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       try {
         await firebase.auth().sendPasswordResetEmail(cleanEmail);
-        return true;
+        console.log('[Auth] Link oficial do Google enviado com sucesso para:', cleanEmail);
+        return {
+          success: true,
+          email: cleanEmail,
+          account: account
+        };
       } catch (fbErr) {
+        console.warn('[Auth] Erro ao enviar reset email pelo Firebase:', fbErr);
         throw new Error(this.translateFirebaseError(fbErr));
       }
     }
 
-    const accounts = this.getLocalAccounts();
-    const acc = accounts.find(a => a.email && a.email.toLowerCase() === cleanEmail);
-    if (!acc) {
-      throw new Error('Nenhuma conta encontrada com este e-mail.');
-    }
-    return true;
+    return {
+      success: true,
+      email: cleanEmail,
+      account: account
+    };
+  },
+
+  // Retrocompatibilidade
+  async sendPasswordReset(email) {
+    return this.sendOfficialPasswordReset(email, email);
   },
 
   // LOGOUT

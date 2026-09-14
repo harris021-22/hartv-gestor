@@ -430,37 +430,15 @@ const App = {
       btnLogout.addEventListener('click', () => this.handleLogout());
     }
 
-    // Esqueci Minha Senha
+    // Recuperação de Senha Integrada
     const btnOpenForgotPass = document.getElementById('btnOpenForgotPass');
     if (btnOpenForgotPass) {
-      btnOpenForgotPass.addEventListener('click', () => {
-        const modal = document.getElementById('forgotPasswordModal');
-        const loginEmail = document.getElementById('loginEmail').value.trim();
-        if (loginEmail) {
-          document.getElementById('forgotEmail').value = loginEmail;
-        }
-        if (modal) modal.classList.add('open');
-      });
+      btnOpenForgotPass.addEventListener('click', () => this.showForgotView());
     }
 
-    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
-    if (forgotPasswordForm) {
-      forgotPasswordForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('forgotEmail').value.trim();
-        const submitBtn = document.getElementById('btnForgotSubmit');
-        try {
-          if (submitBtn) submitBtn.disabled = true;
-          await AuthManager.sendPasswordReset(email);
-          this.closeAllModals();
-          this.showToast(`Link de recuperação enviado para ${email}! Verifique seu e-mail.`, 'success');
-          forgotPasswordForm.reset();
-        } catch (err) {
-          alert(err.message || 'Erro ao enviar link de recuperação.');
-        } finally {
-          if (submitBtn) submitBtn.disabled = false;
-        }
-      });
+    const formForgotPass = document.getElementById('formForgotPass');
+    if (formForgotPass) {
+      formForgotPass.addEventListener('submit', (e) => this.handleForgotSubmit(e));
     }
 
     // Botão Rápido de Usuários no Header (Admin Master)
@@ -1158,7 +1136,147 @@ const App = {
     }
   },
 
-  // Sair da Conta (Logout)
+  // Alternar para tela de Recuperação de Senha (dentro do próprio card)
+  showForgotView() {
+    const loginView = document.getElementById('authLoginView');
+    const forgotView = document.getElementById('authForgotView');
+    const loginEmailInput = document.getElementById('loginEmail');
+    const forgotUserInput = document.getElementById('forgotUserInput');
+    const resultBox = document.getElementById('forgotResultBox');
+    const formForgot = document.getElementById('formForgotPass');
+
+    if (resultBox) resultBox.style.display = 'none';
+    if (formForgot) formForgot.style.display = 'flex';
+
+    if (loginView) loginView.style.display = 'none';
+    if (forgotView) {
+      forgotView.style.display = 'block';
+      const typed = loginEmailInput ? loginEmailInput.value.trim() : '';
+      if (forgotUserInput) {
+        if (typed) {
+          forgotUserInput.value = typed;
+          this.handleForgotUserTyping(typed);
+        } else {
+          forgotUserInput.focus();
+        }
+      }
+    }
+  },
+
+  // Voltar para tela de Login tradicional
+  showLoginView() {
+    const loginView = document.getElementById('authLoginView');
+    const forgotView = document.getElementById('authForgotView');
+    const loginEmailInput = document.getElementById('loginEmail');
+    const forgotUserInput = document.getElementById('forgotUserInput');
+
+    if (forgotView) forgotView.style.display = 'none';
+    if (loginView) {
+      loginView.style.display = 'block';
+      if (forgotUserInput && loginEmailInput && forgotUserInput.value.trim()) {
+        loginEmailInput.value = forgotUserInput.value.trim();
+      }
+    }
+  },
+
+  // Busca do usuário em tempo real ao digitar (Debounced)
+  handleForgotUserTyping(value) {
+    if (this._forgotSearchTimer) clearTimeout(this._forgotSearchTimer);
+
+    const badge = document.getElementById('forgotLookupBadge');
+    const savedTag = document.getElementById('forgotSavedTag');
+    const emailInput = document.getElementById('forgotEmailInput');
+    const clean = String(value || '').trim();
+
+    if (!clean || clean.length < 2) {
+      if (badge) badge.textContent = '';
+      if (savedTag) savedTag.style.display = 'none';
+      return;
+    }
+
+    if (badge) {
+      badge.textContent = 'Buscando conta...';
+      badge.style.color = 'var(--text-dim)';
+    }
+
+    this._forgotSearchTimer = setTimeout(async () => {
+      try {
+        const account = await AuthManager.findAccountByLogin(clean);
+        if (account) {
+          if (badge) {
+            badge.textContent = '✓ Conta localizada';
+            badge.style.color = '#34d399';
+          }
+          const savedEmail = account.recoveryEmail || (!account.email?.endsWith('@hartv.app') ? account.email : '');
+          if (savedEmail) {
+            if (emailInput) emailInput.value = savedEmail;
+            if (savedTag) savedTag.style.display = 'inline';
+          } else {
+            if (savedTag) savedTag.style.display = 'none';
+          }
+        } else {
+          if (badge) {
+            badge.textContent = clean.includes('@') ? 'E-mail direto' : 'Usuário novo/não listado';
+            badge.style.color = 'var(--text-muted)';
+          }
+          if (savedTag) savedTag.style.display = 'none';
+        }
+      } catch (e) {
+        if (badge) badge.textContent = '';
+      }
+    }, 280);
+  },
+
+  // Enviar link oficial de redefinição segura do Google
+  async handleForgotSubmit(e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const userInput = document.getElementById('forgotUserInput');
+    const emailInput = document.getElementById('forgotEmailInput');
+    const submitBtn = document.getElementById('btnForgotSubmit');
+    const resultBox = document.getElementById('forgotResultBox');
+    const sentNotice = document.getElementById('forgotSentEmailNotice');
+    const formForgot = document.getElementById('formForgotPass');
+
+    const userVal = userInput ? userInput.value.trim() : '';
+    const emailVal = emailInput ? emailInput.value.trim() : '';
+
+    if (!userVal || !emailVal) {
+      alert('Por favor, informe seu usuário e o e-mail de destino.');
+      return;
+    }
+
+    const originalBtn = submitBtn ? submitBtn.innerHTML : '';
+
+    try {
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>⏳ Enviando link oficial do Google...</span>';
+      }
+
+      const res = await AuthManager.sendOfficialPasswordReset(userVal, emailVal);
+
+      if (sentNotice) {
+        sentNotice.textContent = `Enviado com sucesso para: ${res.email || emailVal}`;
+      }
+
+      // Ocultar formulário de envio e mostrar card de confirmação com destaque
+      if (formForgot) formForgot.style.display = 'none';
+      if (resultBox) {
+        resultBox.style.display = 'block';
+        resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      this.showToast(`Link oficial do Google enviado para ${res.email || emailVal}!`, 'success');
+    } catch (err) {
+      alert(err.message || 'Erro ao enviar link de recuperação. Verifique os dados digitados.');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtn || '<span>Enviar Link Oficial do Google</span>';
+      }
+    }
+  },
   async handleLogout() {
     if (confirm('Deseja realmente sair da sua conta?')) {
       this.closeDrawer();

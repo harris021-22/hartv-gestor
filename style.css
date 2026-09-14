@@ -1493,6 +1493,69 @@ body {
   text-decoration: underline;
 }
 
+/* Botão de Retorno (Voltar ao Login) */
+.back-link-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+  margin-bottom: 2px;
+}
+
+.back-link-btn .svg-icon {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  stroke-width: 2.2;
+}
+
+.back-link-btn:hover {
+  color: var(--primary-light);
+  transform: translateX(-3px);
+}
+
+.auth-recovery-header {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Card de Resultado da Recuperação */
+.recovery-result-card {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  animation: scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.recovery-result-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.recovery-check-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #10b981;
+  color: #04241a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+}
+
 /* Cards de Gerenciamento de Contas */
 /* Card de Criação de Novo Usuário (Admin Master) */
 .admin-create-user-card {

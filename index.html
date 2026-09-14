@@ -25,7 +25,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap">
 
   <!-- Estilos -->
-  <link rel="stylesheet" href="./style.css?v=22.0">
+  <link rel="stylesheet" href="./style.css?v=22.1">
 
   <!-- Pré-ativação Imediata do Tema (Zero Flicker) -->
   <script>
@@ -598,61 +598,97 @@
         <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 4px;">Acesso exclusivo ao painel</p>
       </div>
 
-      <!-- Form Login -->
-      <form id="formLogin" class="auth-form" onsubmit="App.handleLoginSubmit(event)">
-        <div class="form-group">
-          <label class="form-label" for="loginEmail">Usuário ou E-mail</label>
-          <input type="text" id="loginEmail" class="form-input" placeholder="Digite seu usuário ou e-mail" required autocomplete="username">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="loginPassword">Senha</label>
-          <div class="password-field-group no-gen">
-            <input type="password" id="loginPassword" class="form-input" placeholder="Sua senha secreta" required autocomplete="current-password">
-            <div class="password-actions-inside">
-              <button type="button" class="pwd-inline-btn" id="btnToggleLoginPass" onclick="App.toggleInputPassword('loginPassword', this)" title="Ver / Ocultar Senha" aria-label="Mostrar ou ocultar senha">
-                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              </button>
+      <!-- VIEW 1: Login -->
+      <div id="authLoginView">
+        <form id="formLogin" class="auth-form" onsubmit="App.handleLoginSubmit(event)">
+          <div class="form-group">
+            <label class="form-label" for="loginEmail">Usuário ou E-mail</label>
+            <input type="text" id="loginEmail" class="form-input" placeholder="Digite seu usuário ou e-mail" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="loginPassword">Senha</label>
+            <div class="password-field-group no-gen">
+              <input type="password" id="loginPassword" class="form-input" placeholder="Sua senha secreta" required autocomplete="current-password">
+              <div class="password-actions-inside">
+                <button type="button" class="pwd-inline-btn" id="btnToggleLoginPass" onclick="App.toggleInputPassword('loginPassword', this)" title="Ver / Ocultar Senha" aria-label="Mostrar ou ocultar senha">
+                  <svg class="svg-icon" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                </button>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+              <button type="button" id="btnOpenForgotPass" class="text-link-btn" onclick="App.showForgotView()">Esqueceu a senha?</button>
             </div>
           </div>
-          <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
-            <button type="button" id="btnOpenForgotPass" class="text-link-btn">Esqueceu a senha?</button>
-          </div>
+          <button type="submit" id="btnLoginSubmit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
+            <span>Entrar no Painel</span>
+          </button>
+        </form>
+
+        <div class="auth-security-badge" style="margin-top: 14px;">
+          Acesso seguro e exclusivo. O seu usuário e senha são fornecidos diretamente pelo Administrador.
         </div>
-        <button type="submit" id="btnLoginSubmit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
-          <span>Entrar no Painel</span>
-        </button>
-      </form>
-
-      <div class="auth-security-badge">
-        Acesso seguro e exclusivo. O seu usuário e senha são fornecidos diretamente pelo Administrador.
       </div>
-    </div>
-  </div>
 
-  <!-- MODAL: Esqueci Minha Senha -->
-  <div id="forgotPasswordModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 440px;">
-      <div class="modal-header">
-        <h2 class="modal-title">Redefinir Senha</h2>
-        <button class="modal-close">&times;</button>
-      </div>
-      <form id="forgotPasswordForm">
-        <div class="modal-body">
-          <p style="font-size: 0.85rem; color: var(--text-muted);">
-            Informe o e-mail cadastrado. Enviaremos um link oficial e seguro para você redefinir a sua senha.
+      <!-- VIEW 2: Recuperação de Senha Segura Oficial -->
+      <div id="authForgotView" style="display: none;">
+        <div class="auth-recovery-header">
+          <button type="button" class="back-link-btn" onclick="App.showLoginView()" title="Voltar ao Login">
+            <svg class="svg-icon" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            <span>Voltar ao login</span>
+          </button>
+          <h2 style="font-size: 1.15rem; font-weight: 700; color: #ffffff; margin-top: 8px; font-family: 'Outfit', sans-serif;">Recuperação Segura</h2>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+            Enviaremos o link oficial e criptografado do Google para você redefinir sua senha com total proteção.
           </p>
-          <div class="form-group">
-            <label class="form-label" for="forgotEmail">Seu E-mail Cadastrado</label>
-            <input type="email" id="forgotEmail" class="form-input" placeholder="seuemail@exemplo.com" required>
-          </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary modal-cancel">Cancelar</button>
-          <button type="submit" id="btnForgotSubmit" class="btn btn-primary">
-            <span>Enviar Link</span>
+
+        <form id="formForgotPass" class="auth-form" onsubmit="App.handleForgotSubmit(event)" style="margin-top: 12px;">
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label class="form-label" for="forgotUserInput">Seu Usuário ou Login</label>
+              <span id="forgotLookupBadge" style="font-size: 0.72rem; font-weight: 600;"></span>
+            </div>
+            <input type="text" id="forgotUserInput" class="form-input" placeholder="Ex: carlos ou seu@email.com" required autocomplete="username" oninput="App.handleForgotUserTyping(this.value)">
+          </div>
+
+          <div class="form-group" id="forgotEmailGroup">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label class="form-label" for="forgotEmailInput">E-mail para Receber o Link</label>
+              <span id="forgotSavedTag" style="font-size: 0.72rem; color: #34d399; font-weight: 600; display: none;">✓ E-mail salvo</span>
+            </div>
+            <input type="email" id="forgotEmailInput" class="form-input" placeholder="seuemail@exemplo.com" required autocomplete="email">
+            <span id="forgotEmailHelp" style="font-size: 0.74rem; color: var(--text-dim); line-height: 1.3;">
+              Este e-mail ficará salvo vinculado à sua conta para suas próximas recuperações.
+            </span>
+          </div>
+
+          <button type="submit" id="btnForgotSubmit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
+            <span>Enviar Link Oficial do Google</span>
+          </button>
+        </form>
+
+        <!-- Mensagem de Sucesso pós-envio -->
+        <div id="forgotResultBox" class="recovery-result-card" style="display: none; margin-top: 14px;">
+          <div class="recovery-result-header">
+            <span class="recovery-check-icon">✓</span>
+            <div>
+              <div style="font-weight: 700; color: #ffffff; font-size: 0.95rem;">Link Oficial Enviado!</div>
+              <div id="forgotSentEmailNotice" style="font-size: 0.78rem; color: #a7f3d0; margin-top: 2px;">
+                Verifique a caixa de entrada de seu e-mail
+              </div>
+            </div>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; margin-top: 10px;">
+            Enviamos o link seguro do Google para o seu e-mail cadastrado. Acesse sua caixa de entrada e clique no link para redefinir sua senha com segurança.
+          </p>
+          <div style="font-size: 0.74rem; color: #fbbf24; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px; padding: 8px 10px; margin-top: 8px;">
+            💡 <strong>Dica:</strong> Se não encontrar na caixa de entrada principal, dê uma olhada na pasta de <strong>Spam / Lixo Eletrônico</strong>.
+          </div>
+          <button type="button" class="btn btn-primary" onclick="App.showLoginView()" style="width: 100%; justify-content: center; padding: 11px; margin-top: 12px;">
+            <span>Ir para Tela de Login</span>
           </button>
         </div>
-      </form>
+      </div>
     </div>
   </div>
 
@@ -946,10 +982,10 @@ service cloud.firestore {
 
   <!-- Scripts da Aplicação -->
   <script src="./firebase-config.js?v=21.0"></script>
-  <script src="./auth.js?v=21.0"></script>
+  <script src="./auth.js?v=22.1"></script>
   <script src="./database.js?v=21.0"></script>
   <script src="./storage.js?v=21.0"></script>
   <script src="./notifications.js?v=21.0"></script>
-  <script src="./app.js?v=22.0"></script>
+  <script src="./app.js?v=22.1"></script>
 </body>
 </html>
