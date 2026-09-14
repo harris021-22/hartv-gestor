@@ -113,7 +113,7 @@ const App = {
   // Registrar Service Worker
   setupServiceWorker() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=27')
+      navigator.serviceWorker.register('./sw.js?v=28')
         .then((reg) => {
           console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
           reg.update().catch(() => {});
@@ -961,31 +961,37 @@ const App = {
       const accounts = await AuthManager.getAccountsList();
       const currentUser = AuthManager.getUser();
 
+      // Filtrar e eliminar qualquer resquício de teste1 / pepreto018
+      const validAccounts = accounts.filter(acc => {
+        const mail = String(acc.email || '').toLowerCase().trim();
+        const usr = String(acc.username || '').toLowerCase().trim();
+        const dName = String(acc.displayName || '').toLowerCase().trim();
+        if (mail.includes('pepreto') || usr === '123456' || dName === 'teste1') return false;
+        return true;
+      });
+
       const purgeHeader = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color);">
-          <span style="font-size: 0.78rem; color: var(--text-muted);">Total de usuários: <strong>${accounts.length}</strong></span>
+          <span style="font-size: 0.78rem; color: var(--text-muted);">Total de usuários: <strong>${validAccounts.length}</strong></span>
           <button class="btn btn-danger" style="font-size: 0.72rem; padding: 5px 10px; display: inline-flex; align-items: center; gap: 4px;" onclick="App.handlePurgeOtherAccounts()">
             ${this.Icons.trash(13)} <span>Limpar Outras Contas</span>
           </button>
         </div>
       `;
 
-      if (accounts.length === 0) {
+      if (validAccounts.length === 0) {
         container.innerHTML = purgeHeader + '<div style="text-align: center; color: var(--text-dim); padding: 20px;">Nenhum usuário cadastrado além de você.</div>';
         return;
       }
 
-      container.innerHTML = purgeHeader + accounts.map(acc => {
+      container.innerHTML = purgeHeader + validAccounts.map(acc => {
         const masterEmail = 'andrew.g.h.agh@gmail.com';
         const accEmail = String(acc.email || '').toLowerCase().trim();
-        const accUser = String(acc.username || '').toLowerCase().trim();
-        const isMaster = accEmail === masterEmail || accUser === 'admin' || accUser === 'andrew';
+        // APENAS E EXCLUSIVAMENTE andrew.g.h.agh@gmail.com pode ser Master
+        const isMaster = accEmail === masterEmail;
 
-        // (Você) só deve aparecer para a conta REALMENTE logada no momento
-        const isCurrent = currentUser && (
-          (currentUser.email && currentUser.email.toLowerCase() === accEmail) ||
-          (currentUser.uid && acc.uid && currentUser.uid === acc.uid && isMaster === (currentUser.role === 'admin'))
-        );
+        // (Você) só aparece na conta que estiver efetivamente logada
+        const isCurrent = currentUser && currentUser.email && currentUser.email.toLowerCase() === accEmail;
 
         const status = acc.status || 'approved';
         let statusBadge = '<span class="status-pill approved">Ativo</span>';

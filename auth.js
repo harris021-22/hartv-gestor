@@ -8,7 +8,7 @@ const AuthManager = {
   currentUser: null,
   authListeners: [],
 
-  // E-mail do Administrador Master Principal (ÚNICO QUE PODE SER ADMIN)
+  // E-mail do Administrador Master Principal (ÚNICO E EXCLUSIVO QUE PODE SER ADMIN)
   MASTER_ADMIN_EMAILS: [
     'andrew.g.h.agh@gmail.com'
   ],
@@ -16,7 +16,7 @@ const AuthManager = {
   isMasterEmail(email) {
     if (!email) return false;
     const clean = String(email).trim().toLowerCase();
-    return this.MASTER_ADMIN_EMAILS.includes(clean) || clean === 'admin' || clean === 'andrew';
+    return clean === 'andrew.g.h.agh@gmail.com' || clean === 'admin' || clean === 'andrew';
   },
 
   // Inicialização do Auth
@@ -46,18 +46,22 @@ const AuthManager = {
         }
       }
 
-      // Sanitizar contas locais para garantir que apenas andrew.g.h.agh@gmail.com seja admin
+      // Excluir teste1 e sanitizar contas locais para deixar APENAS andrew.g.h.agh@gmail.com como admin
       const localAccs = this.getLocalAccounts();
-      let hasChange = false;
-      localAccs.forEach(acc => {
-        if (!this.isMasterEmail(acc.email) && acc.role === 'admin') {
+      const cleanedAccs = localAccs.filter(acc => {
+        const mail = String(acc.email || '').toLowerCase().trim();
+        const usr = String(acc.username || '').toLowerCase().trim();
+        const dName = String(acc.displayName || '').toLowerCase().trim();
+        if (mail.includes('pepreto') || usr === '123456' || dName === 'teste1') return false;
+        return true;
+      });
+      cleanedAccs.forEach(acc => {
+        const mail = String(acc.email || '').toLowerCase().trim();
+        if (mail !== 'andrew.g.h.agh@gmail.com') {
           acc.role = 'user';
-          hasChange = true;
         }
       });
-      if (hasChange) {
-        this.saveLocalAccounts(localAccs);
-      }
+      this.saveLocalAccounts(cleanedAccs);
     } catch (e) {
       console.error('Erro ao ler sessão salva:', e);
       this.currentUser = null;
@@ -1059,8 +1063,17 @@ const AuthManager = {
       });
     }
 
+    // Filtrar completamente qualquer resíduo de teste1 / pepreto018
+    const cleanedList = list.filter(a => {
+      const mail = String(a.email || '').toLowerCase().trim();
+      const usr = String(a.username || '').toLowerCase().trim();
+      const dName = String(a.displayName || '').toLowerCase().trim();
+      if (mail.includes('pepreto') || usr === '123456' || dName === 'teste1') return false;
+      return true;
+    });
+
     // Blindagem definitiva: APENAS E EXCLUSIVAMENTE andrew.g.h.agh@gmail.com pode ter role admin
-    list.forEach(a => {
+    cleanedList.forEach(a => {
       const emailLower = String(a.email || '').toLowerCase().trim();
       const userLower = String(a.username || '').toLowerCase().trim();
       const isMasterAcc = emailLower === masterEmail || userLower === 'admin' || userLower === 'andrew';
@@ -1076,7 +1089,7 @@ const AuthManager = {
       }
     });
 
-    return list;
+    return cleanedList;
   },
 
   // Salvar conta localmente com mesclagem
