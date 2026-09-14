@@ -120,6 +120,66 @@ body {
   font-weight: 500;
 }
 
+.brand-text-block {
+  display: flex;
+  flex-direction: column;
+}
+
+/* No celular: manter apenas logo, usuário e menu hambúrguer */
+@media (max-width: 768px) {
+  .app-header {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  /* Ocultar escrita e nuvem conectada no celular */
+  .brand-text-block,
+  .brand-title,
+  .brand-subtitle {
+    display: none !important;
+  }
+
+  #cloudSyncStatus {
+    display: none !important;
+  }
+
+  #btnHeaderUsers {
+    display: none !important;
+  }
+
+  .brand-container {
+    gap: 0;
+    flex-shrink: 0;
+  }
+
+  .brand-logo {
+    width: 38px;
+    height: 38px;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .user-chip {
+    max-width: 155px;
+  }
+
+  .user-name-text {
+    max-width: 95px;
+  }
+
+  .hamburger-btn {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+  }
+}
+
 .header-actions {
   display: flex;
   align-items: center;
