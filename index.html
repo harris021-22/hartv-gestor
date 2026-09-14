@@ -6,7 +6,7 @@
   <title>HarTv Gestor - Gerenciador de Clientes</title>
   
   <!-- PWA & Mobile Meta Tags -->
-  <meta name="theme-color" content="#06b6d4">
+  <meta name="theme-color" content="#0a0e17">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -25,249 +25,8 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap">
 
   <!-- Estilos -->
-  <link rel="stylesheet" href="./style.css?v=13.0">
-  <style>
-    /* Estilos Críticos do Menu Lateral Deslizante (Garante visual perfeito mesmo com cache antigo) */
-    .drawer-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(4, 8, 16, 0.75);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      z-index: 2000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .drawer-overlay.open {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .drawer-content {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 82%;
-      max-width: 320px;
-      height: 100%;
-      background: #0b1120;
-      border-left: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: -10px 0 35px rgba(0, 0, 0, 0.7);
-      display: flex;
-      flex-direction: column;
-      transform: translateX(100%);
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      overflow-y: auto;
-    }
-    .drawer-overlay.open .drawer-content {
-      transform: translateX(0);
-    }
-    .drawer-header {
-      padding: 20px 16px 16px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      background: rgba(255, 255, 255, 0.02);
-    }
-    .drawer-user-card {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      overflow: hidden;
-    }
-    .drawer-user-avatar {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #06b6d4, #8b5cf6);
-      color: #ffffff;
-      font-size: 1.15rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-      flex-shrink: 0;
-    }
-    .drawer-user-details {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      min-width: 0;
-    }
-    .drawer-user-name {
-      font-weight: 700;
-      font-size: 0.95rem;
-      color: #ffffff;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .drawer-user-email {
-      font-size: 0.8rem;
-      color: #94a3b8;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .drawer-role-badge {
-      display: inline-block;
-      font-size: 0.75rem;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 4px;
-      background: rgba(139, 92, 246, 0.2);
-      color: #c084fc;
-      border: 1px solid rgba(139, 92, 246, 0.35);
-      margin-top: 3px;
-      width: fit-content;
-    }
-    .drawer-close-btn {
-      background: transparent;
-      border: none;
-      color: #94a3b8;
-      font-size: 1.6rem;
-      line-height: 1;
-      cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 6px;
-      transition: all 0.2s ease;
-    }
-    .drawer-close-btn:hover {
-      color: #f8fafc;
-      background: rgba(255, 255, 255, 0.08);
-    }
-    .drawer-body {
-      flex: 1;
-      padding: 16px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .drawer-item {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 14px;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 14px;
-      color: #f8fafc;
-      font-size: 0.9rem;
-      font-weight: 500;
-      text-align: left;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .drawer-item:hover {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.08);
-      transform: translateX(3px);
-    }
-    .drawer-item-icon {
-      font-size: 1.15rem;
-      width: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .drawer-item-label {
-      flex: 1;
-    }
-    .drawer-counter-badge {
-      background: #f59e0b;
-      color: #04101e;
-      font-size: 0.8rem;
-      font-weight: 800;
-      padding: 2px 8px;
-      border-radius: 9999px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-    }
-    .drawer-item.admin-item {
-      background: rgba(139, 92, 246, 0.08);
-      border-color: rgba(139, 92, 246, 0.25);
-    }
-    .drawer-footer {
-      padding: 16px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.01);
-    }
-    .drawer-logout-btn {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 11px;
-      background: rgba(239, 68, 68, 0.12);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      color: #f87171;
-      font-size: 0.88rem;
-      font-weight: 600;
-      border-radius: 14px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .drawer-logout-btn:hover {
-      background: rgba(239, 68, 68, 0.2);
-      border-color: #ef4444;
-    }
-    /* Chip de Identificação do Usuário no Header */
-    .user-chip {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 4px 10px 4px 5px;
-      border-radius: 9999px;
-      max-width: 140px;
-      transition: all 0.2s ease;
-      cursor: pointer;
-    }
-    .user-avatar {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #06b6d4, #8b5cf6);
-      color: #ffffff;
-      font-weight: 700;
-      font-size: 0.78rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-      flex-shrink: 0;
-    }
-    .user-name-text {
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: #f8fafc;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .hamburger-btn {
-      background: rgba(15, 23, 42, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: #f8fafc;
-      border-radius: 8px;
-      width: 44px;
-      height: 44px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      position: relative;
-      transition: all 0.2s ease;
-    }
-    .hamburger-btn:hover {
-      background: rgba(6, 182, 212, 0.15);
-      border-color: #06b6d4;
-    }
-  </style>
+  <link rel="stylesheet" href="./style.css?v=14.0">
+
 </head>
 <body>
 
@@ -294,8 +53,8 @@
 
     <div class="header-actions">
       <!-- Indicador de Sincronização em Tempo Real (Nuvem Firestore) -->
-      <div id="cloudSyncStatus" style="display: none; align-items: center; gap: 5px; font-size: 0.72rem; padding: 4px 9px; border-radius: 9999px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; cursor: default;" title="Sincronização em tempo real ativa">
-        <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981; display: inline-block;"></span>
+      <div id="cloudSyncStatus" style="display: none; align-items: center; gap: 5px; font-size: 0.75rem; padding: 4px 9px; border-radius: 9999px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; cursor: default;" title="Sincronização em tempo real ativa">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
         <span id="cloudSyncText">Nuvem Conectada</span>
       </div>
 
@@ -306,15 +65,15 @@
       </div>
 
       <!-- Botão Rápido de Usuários (Apenas Admin Master) -->
-      <button id="btnHeaderUsers" class="btn btn-secondary" style="display: none; padding: 6px 12px; font-size: 0.78rem; gap: 6px; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8; background: rgba(56, 189, 248, 0.08); font-weight: 600;" title="Gerenciar Usuários &amp; Acessos">
+      <button id="btnHeaderUsers" class="btn btn-secondary" style="display: none; padding: 6px 12px; font-size: 0.78rem; gap: 6px; border-color: rgba(37, 99, 235, 0.3); color: #93c5fd; background: rgba(37, 99, 235, 0.08); font-weight: 600;" title="Gerenciar Usuários &amp; Acessos">
         <span>👥 Usuários</span>
-        <span id="headerUsersCountBadge" style="display: none; background: #38bdf8; color: #04101e; font-size: 0.65rem; font-weight: 800; padding: 1px 6px; border-radius: 9999px;">0</span>
+        <span id="headerUsersCountBadge" style="display: none; background: #2563eb; color: #ffffff; font-size: 0.75rem; font-weight: 700; padding: 1px 6px; border-radius: 9999px;">0</span>
       </button>
 
       <!-- Botão Menu Hambúrguer -->
       <button id="btnHamburger" class="icon-btn hamburger-btn" title="Abrir Menu">
         <span style="font-size: 1.3rem; line-height: 1;">☰</span>
-        <span id="drawerBadge" class="badge-dot" style="display: none; background: #f59e0b; box-shadow: 0 0 8px #f59e0b;"></span>
+        <span id="drawerBadge" class="badge-dot" style="display: none; background: #f59e0b;"></span>
       </button>
     </div>
   </header>
@@ -513,7 +272,7 @@
             <div class="form-group">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <label class="form-label" for="clientPassword">Senha</label>
-                <button type="button" id="btnGenPassword" style="background: none; border: none; color: var(--primary); font-size: 0.72rem; cursor: pointer;">⚡ Gerar</button>
+                <button type="button" id="btnGenPassword" style="background: none; border: none; color: var(--primary); font-size: 0.75rem; font-weight: 600; cursor: pointer;">⚡ Gerar</button>
               </div>
               <input type="text" id="clientPassword" class="form-input" placeholder="Ex: pass456">
             </div>
@@ -586,7 +345,7 @@
             </button>
           </div>
 
-          <div style="margin-top: 16px; padding: 12px; background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: var(--radius-sm); font-size: 0.78rem; color: #cbd5e1;">
+          <div style="margin-top: 16px; padding: 12px; background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: var(--radius-sm); font-size: 0.8125rem; color: #cbd5e1;">
             💡 <strong>Dica de Uso:</strong> Seus dados nunca vão para servidores de terceiros. Todo o gerenciamento é 100% privado no seu próprio aparelho.
           </div>
         </div>
@@ -648,12 +407,12 @@
 
       <div class="modal-body" style="gap: 16px;">
         <!-- Opção 1: Enviar Dados de Acesso -->
-        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="padding-bottom: 14px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <strong style="font-size: 0.95rem; color: #ffffff;">🚀 Dados de Acesso IPTV</strong>
-            <span style="font-size: 0.72rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 6px;">Boas-Vindas</span>
+            <span style="font-size: 0.75rem; font-weight: 600; background: rgba(37, 99, 235, 0.15); color: #93c5fd; padding: 3px 8px; border-radius: 6px;">Boas-Vindas</span>
           </div>
-          <p style="font-size: 0.78rem; color: var(--text-muted);">
+          <p style="font-size: 0.8125rem; color: var(--text-muted);">
             Envia o aplicativo, URL/DNS, usuário, senha e vencimento para o cliente.
           </p>
           <div style="display: flex; gap: 8px; margin-top: 4px;">
@@ -667,12 +426,12 @@
         </div>
 
         <!-- Opção 2: Enviar Cobrança / Renovação Pix -->
-        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="padding-top: 2px; display: flex; flex-direction: column; gap: 8px;">
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <strong style="font-size: 0.95rem; color: #ffffff;">💰 Lembrete de Cobrança (Pix)</strong>
-            <span style="font-size: 0.72rem; background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 6px;">Renovação</span>
+            <span style="font-size: 0.75rem; font-weight: 600; background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 3px 8px; border-radius: 6px;">Renovação</span>
           </div>
-          <p style="font-size: 0.78rem; color: var(--text-muted);">
+          <p style="font-size: 0.8125rem; color: var(--text-muted);">
             Envia lembrete de vencimento, valor da mensalidade e sua chave Pix configurada.
           </p>
           <div style="display: flex; gap: 8px; margin-top: 4px;">
@@ -755,14 +514,14 @@
           <div class="form-group">
             <label class="form-label" for="settingBillingMsg">Modelo de Mensagem de Cobrança</label>
             <textarea id="settingBillingMsg" class="form-textarea" rows="3"></textarea>
-            <span style="font-size: 0.7rem; color: var(--text-dim);">Variáveis: {NOME}, {VENCIMENTO}, {VALOR}, {PIX}, {TITULAR}, {BANCO}</span>
+            <span style="font-size: 0.75rem; color: var(--text-dim);">Variáveis: {NOME}, {VENCIMENTO}, {VALOR}, {PIX}, {TITULAR}, {BANCO}</span>
           </div>
 
           <!-- Modelo de Mensagem de Acesso -->
           <div class="form-group">
             <label class="form-label" for="settingAccessMsg">Modelo de Dados de Acesso</label>
             <textarea id="settingAccessMsg" class="form-textarea" rows="4"></textarea>
-            <span style="font-size: 0.7rem; color: var(--text-dim);">Variáveis: {NOME}, {APP}, {URL}, {USUARIO}, {SENHA}, {MAC}, {CHAVE}, {VENCIMENTO}</span>
+            <span style="font-size: 0.75rem; color: var(--text-dim);">Variáveis: {NOME}, {APP}, {URL}, {USUARIO}, {SENHA}, {MAC}, {CHAVE}, {VENCIMENTO}</span>
           </div>
         </div>
 
@@ -845,30 +604,30 @@
       </div>
       <div class="modal-body">
         <!-- Formulário para Criar Novo Usuário -->
-        <div class="admin-create-user-card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+        <div class="admin-create-user-card">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-            <span style="font-size: 0.92rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 0.92rem; font-weight: 700; color: #60a5fa; display: flex; align-items: center; gap: 6px;">
               <span>➕ Adicionar Novo Usuário</span>
             </span>
-            <span style="font-size: 0.7rem; color: #a7f3d0; background: rgba(16, 185, 129, 0.15); padding: 3px 8px; border-radius: 9999px; font-weight: 600;">⚡ Liberação Direta</span>
+            <span style="font-size: 0.75rem; color: #a7f3d0; background: rgba(16, 185, 129, 0.15); padding: 3px 8px; border-radius: 9999px; font-weight: 600;">⚡ Liberação Direta</span>
           </div>
           
           <form id="formAdminCreateUser" onsubmit="App.handleAdminCreateUser(event)" style="display: flex; flex-direction: column; gap: 10px;">
             <div class="form-group" style="margin-bottom: 0;">
-              <label class="form-label" for="adminNewUserName" style="font-size: 0.74rem;">Nome ou Identificação do Usuário:</label>
+              <label class="form-label" for="adminNewUserName">Nome ou Identificação do Usuário:</label>
               <input type="text" id="adminNewUserName" class="form-input" placeholder="Ex: Carlos Silva ou Loja Centro" required style="padding: 8px 12px; font-size: 0.85rem;">
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
               <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label" for="adminNewUserLogin" style="font-size: 0.74rem;">Usuário ou E-mail:</label>
+                <label class="form-label" for="adminNewUserLogin">Usuário ou E-mail:</label>
                 <input type="text" id="adminNewUserLogin" class="form-input" placeholder="Ex: carlos123 ou carlos@gmail.com" required style="padding: 8px 12px; font-size: 0.85rem;">
               </div>
               <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label" for="adminNewUserPassword" style="font-size: 0.74rem;">Senha (mínimo 6 dígitos):</label>
+                <label class="form-label" for="adminNewUserPassword">Senha (mínimo 6 dígitos):</label>
                 <div style="position: relative; display: flex; align-items: center;">
                   <input type="text" id="adminNewUserPassword" class="form-input" placeholder="Ex: 123456" minlength="6" required style="padding: 8px 36px 8px 12px; font-size: 0.85rem; width: 100%;">
-                  <button type="button" onclick="App.generateRandomPassword()" style="position: absolute; right: 4px; background: none; border: none; font-size: 1.05rem; cursor: pointer; color: #38bdf8; padding: 4px;" title="Gerar Senha Aleatória Automática">🎲</button>
+                  <button type="button" onclick="App.generateRandomPassword()" style="position: absolute; right: 4px; background: none; border: none; font-size: 1.05rem; cursor: pointer; color: #60a5fa; padding: 4px;" title="Gerar Senha Aleatória Automática">🎲</button>
                 </div>
               </div>
             </div>
@@ -970,7 +729,7 @@
           <li>Clique em <strong>"🔗 Abrir Firebase Console"</strong>.</li>
           <li>Cole no editor e clique no botão azul <strong>"Publicar" (Publish)</strong>.</li>
         </ol>
-        <div style="background: rgba(0, 0, 0, 0.4); border-radius: 6px; padding: 10px; font-family: monospace; font-size: 0.74rem; color: #38bdf8; max-height: 110px; overflow-y: auto; white-space: pre;">rules_version = '2';
+        <div style="background: rgba(0, 0, 0, 0.4); border-radius: 6px; padding: 10px; font-family: monospace; font-size: 0.75rem; color: #93c5fd; max-height: 110px; overflow-y: auto; white-space: pre;">rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /system_accounts/{document=**} {
