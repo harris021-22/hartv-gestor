@@ -24,11 +24,26 @@ const DatabaseManager = {
     return this.db !== null;
   },
 
+  // Obter o UID autenticado para cumprir com as regras de segurança do Firestore (request.auth.uid == userId)
+  getEffectiveUserId(userId) {
+    if (window.firebase && firebase.auth && firebase.auth().currentUser) {
+      return firebase.auth().currentUser.uid;
+    }
+    return userId;
+  },
+
+  // Checar se há autenticação ativa no Firebase Auth para operações na nuvem
+  hasCloudAuth() {
+    return !!(window.firebase && firebase.auth && firebase.auth().currentUser);
+  },
+
   // Salvar ou atualizar cliente na nuvem
   async saveClient(userId, client) {
     if (!this.isAvailable() || !userId || !client || !client.id) return false;
+    if (!this.hasCloudAuth()) return false;
+    const effectiveUserId = this.getEffectiveUserId(userId);
     try {
-      await this.db.collection('users').doc(userId).collection('clients').doc(client.id).set(client, { merge: true });
+      await this.db.collection('users').doc(effectiveUserId).collection('clients').doc(client.id).set(client, { merge: true });
       console.log(`[DB] Cliente "${client.name || client.id}" sincronizado na nuvem.`);
       return true;
     } catch (e) {
@@ -40,8 +55,10 @@ const DatabaseManager = {
   // Excluir cliente da nuvem
   async deleteClient(userId, clientId) {
     if (!this.isAvailable() || !userId || !clientId) return false;
+    if (!this.hasCloudAuth()) return false;
+    const effectiveUserId = this.getEffectiveUserId(userId);
     try {
-      await this.db.collection('users').doc(userId).collection('clients').doc(clientId).delete();
+      await this.db.collection('users').doc(effectiveUserId).collection('clients').doc(clientId).delete();
       console.log(`[DB] Cliente "${clientId}" excluído da nuvem.`);
       return true;
     } catch (e) {
@@ -53,8 +70,10 @@ const DatabaseManager = {
   // Buscar todos os clientes do usuário na nuvem (uma vez)
   async fetchClients(userId) {
     if (!this.isAvailable() || !userId) return null;
+    if (!this.hasCloudAuth()) return null;
+    const effectiveUserId = this.getEffectiveUserId(userId);
     try {
-      const snapshot = await this.db.collection('users').doc(userId).collection('clients').get();
+      const snapshot = await this.db.collection('users').doc(effectiveUserId).collection('clients').get();
       const list = [];
       snapshot.forEach(doc => {
         const data = doc.data();
@@ -78,10 +97,17 @@ const DatabaseManager = {
       this.unsubscribeClients = null;
     }
 
+    if (!this.hasCloudAuth()) {
+      console.log('[DB] Sincronização cloud de clientes em espera (modo local ou sem sessão Firebase).');
+      return () => {};
+    }
+
+    const effectiveUserId = this.getEffectiveUserId(userId);
+
     try {
       this.unsubscribeClients = this.db
         .collection('users')
-        .doc(userId)
+        .doc(effectiveUserId)
         .collection('clients')
         .onSnapshot((snapshot) => {
           const cloudClients = [];
@@ -96,7 +122,7 @@ const DatabaseManager = {
             callback(cloudClients);
           }
         }, (error) => {
-          console.warn('[DB] Erro no listener realtime de clientes:', error);
+          console.warn('[DB] Aviso no listener realtime de clientes:', error);
         });
 
       return this.unsubscribeClients;
@@ -109,8 +135,10 @@ const DatabaseManager = {
   // Salvar configurações na nuvem
   async saveSettings(userId, settings) {
     if (!this.isAvailable() || !userId || !settings) return false;
+    if (!this.hasCloudAuth()) return false;
+    const effectiveUserId = this.getEffectiveUserId(userId);
     try {
-      await this.db.collection('users').doc(userId).collection('settings').doc('config').set(settings, { merge: true });
+      await this.db.collection('users').doc(effectiveUserId).collection('settings').doc('config').set(settings, { merge: true });
       return true;
     } catch (e) {
       console.warn('[DB] Erro ao salvar configurações no Firestore:', e);
@@ -127,10 +155,16 @@ const DatabaseManager = {
       this.unsubscribeSettings = null;
     }
 
+    if (!this.hasCloudAuth()) {
+      return () => {};
+    }
+
+    const effectiveUserId = this.getEffectiveUserId(userId);
+
     try {
       this.unsubscribeSettings = this.db
         .collection('users')
-        .doc(userId)
+        .doc(effectiveUserId)
         .collection('settings')
         .doc('config')
         .onSnapshot((docSnap) => {
@@ -141,7 +175,7 @@ const DatabaseManager = {
             }
           }
         }, (error) => {
-          console.warn('[DB] Erro no listener realtime de configurações:', error);
+          console.warn('[DB] Aviso no listener realtime de configurações:', error);
         });
 
       return this.unsubscribeSettings;
@@ -166,11 +200,13 @@ const DatabaseManager = {
   // Sincronizar lote inteiro para a nuvem
   async syncAllClients(userId, clients) {
     if (!this.isAvailable() || !userId || !Array.isArray(clients)) return false;
+    if (!this.hasCloudAuth()) return false;
+    const effectiveUserId = this.getEffectiveUserId(userId);
     try {
       const batch = this.db.batch();
       clients.forEach(c => {
         if (c && c.id) {
-          const docRef = this.db.collection('users').doc(userId).collection('clients').doc(c.id);
+          const docRef = this.db.collection('users').doc(effectiveUserId).collection('clients').doc(c.id);
           batch.set(docRef, c, { merge: true });
         }
       });

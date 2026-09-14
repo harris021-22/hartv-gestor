@@ -1137,6 +1137,25 @@ const App = {
   },
 
   // Alternar para tela de Recuperação de Senha (dentro do próprio card)
+  // Mascarar visualmente o e-mail para privacidade e segurança (ex: pep***018@gmail.com)
+  maskEmail(email) {
+    if (!email || typeof email !== 'string' || !email.includes('@')) return email || '';
+    const parts = email.trim().toLowerCase().split('@');
+    const name = parts[0];
+    const domain = parts[1];
+
+    if (name.length <= 2) {
+      return `${name[0]}***@${domain}`;
+    } else if (name.length <= 5) {
+      return `${name.slice(0, 2)}***@${domain}`;
+    } else if (name.length <= 8) {
+      return `${name.slice(0, 2)}***${name.slice(-2)}@${domain}`;
+    } else {
+      // Ex: pepreto018 -> pep***018@gmail.com
+      return `${name.slice(0, 3)}***${name.slice(-3)}@${domain}`;
+    }
+  },
+
   showForgotView() {
     const loginView = document.getElementById('authLoginView');
     const forgotView = document.getElementById('authForgotView');
@@ -1144,6 +1163,7 @@ const App = {
     const forgotUserInput = document.getElementById('forgotUserInput');
     const resultBox = document.getElementById('forgotResultBox');
     const formForgot = document.getElementById('formForgotPass');
+    const emailInput = document.getElementById('forgotEmailInput');
 
     if (resultBox) resultBox.style.display = 'none';
     if (formForgot) formForgot.style.display = 'flex';
@@ -1157,6 +1177,12 @@ const App = {
           forgotUserInput.value = typed;
           this.handleForgotUserTyping(typed);
         } else {
+          if (emailInput) {
+            delete emailInput.dataset.fullEmail;
+            emailInput.readOnly = false;
+            emailInput.classList.remove('is-locked');
+            emailInput.value = '';
+          }
           forgotUserInput.focus();
         }
       }
@@ -1179,18 +1205,29 @@ const App = {
     }
   },
 
-  // Busca do usuário em tempo real ao digitar (Debounced)
+  // Busca do usuário em tempo real ao digitar (Debounced com Mascaramento e Bloqueio Seguro)
   handleForgotUserTyping(value) {
     if (this._forgotSearchTimer) clearTimeout(this._forgotSearchTimer);
 
     const badge = document.getElementById('forgotLookupBadge');
     const savedTag = document.getElementById('forgotSavedTag');
     const emailInput = document.getElementById('forgotEmailInput');
+    const emailHelp = document.getElementById('forgotEmailHelp');
     const clean = String(value || '').trim();
 
     if (!clean || clean.length < 2) {
       if (badge) badge.textContent = '';
       if (savedTag) savedTag.style.display = 'none';
+      if (emailInput) {
+        delete emailInput.dataset.fullEmail;
+        emailInput.readOnly = false;
+        emailInput.classList.remove('is-locked');
+        emailInput.value = '';
+      }
+      if (emailHelp) {
+        emailHelp.innerHTML = 'Este e-mail ficará salvo vinculado à sua conta para suas próximas recuperações.';
+        emailHelp.style.color = 'var(--text-dim)';
+      }
       return;
     }
 
@@ -1209,17 +1246,53 @@ const App = {
           }
           const savedEmail = account.recoveryEmail || (!account.email?.endsWith('@hartv.app') ? account.email : '');
           if (savedEmail) {
-            if (emailInput) emailInput.value = savedEmail;
-            if (savedTag) savedTag.style.display = 'inline';
+            // E-mail existente: bloquear campo e mascarar visualmente para sigilo e segurança
+            if (emailInput) {
+              emailInput.dataset.fullEmail = savedEmail;
+              emailInput.value = this.maskEmail(savedEmail);
+              emailInput.readOnly = true;
+              emailInput.classList.add('is-locked');
+            }
+            if (savedTag) {
+              savedTag.style.display = 'inline-flex';
+              savedTag.style.alignItems = 'center';
+              savedTag.style.gap = '4px';
+              savedTag.innerHTML = '🔒 <span>E-mail fixo e protegido</span>';
+            }
+            if (emailHelp) {
+              emailHelp.innerHTML = '🔒 <em>E-mail protegido:</em> o link oficial será enviado diretamente para o e-mail cadastrado acima com total sigilo.';
+              emailHelp.style.color = '#34d399';
+            }
           } else {
+            // Conta encontrada mas ainda sem e-mail: permitir digitação inicial
+            if (emailInput) {
+              delete emailInput.dataset.fullEmail;
+              emailInput.readOnly = false;
+              emailInput.classList.remove('is-locked');
+              if (emailInput.value.includes('***')) emailInput.value = '';
+            }
             if (savedTag) savedTag.style.display = 'none';
+            if (emailHelp) {
+              emailHelp.innerHTML = '💡 <em>Primeira recuperação:</em> digite seu e-mail para vinculá-lo permanentemente à sua conta.';
+              emailHelp.style.color = '#38bdf8';
+            }
           }
         } else {
           if (badge) {
             badge.textContent = clean.includes('@') ? 'E-mail direto' : 'Usuário novo/não listado';
             badge.style.color = 'var(--text-muted)';
           }
+          if (emailInput) {
+            delete emailInput.dataset.fullEmail;
+            emailInput.readOnly = false;
+            emailInput.classList.remove('is-locked');
+            if (emailInput.value.includes('***')) emailInput.value = '';
+          }
           if (savedTag) savedTag.style.display = 'none';
+          if (emailHelp) {
+            emailHelp.innerHTML = 'Este e-mail ficará salvo vinculado à sua conta para suas próximas recuperações.';
+            emailHelp.style.color = 'var(--text-dim)';
+          }
         }
       } catch (e) {
         if (badge) badge.textContent = '';
@@ -1242,7 +1315,10 @@ const App = {
     this._isSendingForgot = true;
 
     const userVal = userInput ? userInput.value.trim() : '';
-    const emailVal = emailInput ? emailInput.value.trim() : '';
+    // Usar o e-mail real completo se estiver mascarado/fixo, ou o valor digitado
+    const emailVal = (emailInput && emailInput.dataset && emailInput.dataset.fullEmail) 
+      ? emailInput.dataset.fullEmail 
+      : (emailInput ? emailInput.value.trim() : '');
 
     if (!userVal || !emailVal) {
       alert('Por favor, informe seu usuário e o e-mail de destino.');
@@ -1259,9 +1335,10 @@ const App = {
       }
 
       const res = await AuthManager.sendOfficialPasswordReset(userVal, emailVal);
+      const maskedTarget = this.maskEmail(res.email || emailVal);
 
       if (sentNotice) {
-        sentNotice.textContent = `Enviado com sucesso para: ${res.email || emailVal}`;
+        sentNotice.textContent = `Enviado com sucesso para: ${maskedTarget}`;
       }
 
       // Ocultar formulário de envio e mostrar card de confirmação com destaque
@@ -1271,7 +1348,7 @@ const App = {
         resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
 
-      this.showToast(`Link oficial do Google enviado para ${res.email || emailVal}!`, 'success');
+      this.showToast(`Link oficial do Google enviado para ${maskedTarget}!`, 'success');
     } catch (err) {
       alert(err.message || 'Erro ao enviar link de recuperação. Verifique os dados digitados.');
     } finally {

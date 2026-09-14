@@ -555,7 +555,32 @@ const AuthManager = {
       }
 
       if (firebaseUser) {
-        const userUid = account?.uid || firebaseUser.uid;
+        const firebaseUid = firebaseUser.uid;
+
+        // Migrar dados locais se a conta possuía um UID local diferente (ex: gerado localmente como usr_...)
+        if (account?.uid && account.uid !== firebaseUid) {
+          try {
+            const oldClientsKey = `hartv_clients_${account.uid}`;
+            const newClientsKey = `hartv_clients_${firebaseUid}`;
+            const oldClients = localStorage.getItem(oldClientsKey);
+            if (oldClients && !localStorage.getItem(newClientsKey)) {
+              localStorage.setItem(newClientsKey, oldClients);
+            }
+            const oldSettingsKey = `hartv_settings_${account.uid}`;
+            const newSettingsKey = `hartv_settings_${firebaseUid}`;
+            const oldSettings = localStorage.getItem(oldSettingsKey);
+            if (oldSettings && !localStorage.getItem(newSettingsKey)) {
+              localStorage.setItem(newSettingsKey, oldSettings);
+            }
+          } catch (e) {
+            console.warn('[Auth] Erro ao migrar cache local de clientes:', e);
+          }
+        }
+
+        // O UID da sessão ativa DEVE ser o firebaseUid para cumprir a regra de segurança do Firestore
+        // (match /users/{userId}/{document=**} { allow read, write: if request.auth.uid == userId; })
+        const userUid = firebaseUid;
+
         const check = await this.checkUserApprovalStatus(userUid, firebaseUser.email);
         if (check.status === 'blocked') {
           await firebase.auth().signOut().catch(() => {});
@@ -564,8 +589,9 @@ const AuthManager = {
           throw new Error('🚫 Sua conta foi desativada pelo administrador.');
         }
 
-        // Sincronizar nova senha no Firestore system_accounts
+        // Sincronizar nova senha e UID no Firestore system_accounts
         const updatePassObj = {
+          uid: firebaseUid,
           plainPassword: cleanPass,
           updatedAt: new Date().toISOString()
         };
@@ -574,6 +600,7 @@ const AuthManager = {
           if (account?.uid) await db.collection('system_accounts').doc(String(account.uid)).set(updatePassObj, { merge: true });
           if (account?.username) await db.collection('system_accounts').doc(account.username.toLowerCase()).set(updatePassObj, { merge: true });
           if (firebaseUser.email) await db.collection('system_accounts').doc(firebaseUser.email.toLowerCase()).set(updatePassObj, { merge: true });
+          await db.collection('system_accounts').doc(firebaseUid).set(updatePassObj, { merge: true });
         } catch (e) {
           console.warn('[Auth] Aviso ao sincronizar nova senha no Firestore:', e);
         }
@@ -586,6 +613,7 @@ const AuthManager = {
               (account?.username && a.username && a.username.toLowerCase() === account.username.toLowerCase()) ||
               (a.email && a.email.toLowerCase() === firebaseUser.email.toLowerCase()) ||
               (a.recoveryEmail && a.recoveryEmail.toLowerCase() === firebaseUser.email.toLowerCase())) {
+            a.uid = firebaseUid;
             a.plainPassword = cleanPass;
             a.passwordHash = this.simpleHash(cleanPass);
             a.email = firebaseUser.email;
@@ -595,6 +623,7 @@ const AuthManager = {
         if (!foundInLocal && account) {
           accounts.push({
             ...account,
+            uid: firebaseUid,
             plainPassword: cleanPass,
             passwordHash: this.simpleHash(cleanPass),
             email: firebaseUser.email
@@ -642,7 +671,31 @@ const AuthManager = {
     if (lastFbError) {
       throw new Error(this.translateFirebaseError(lastFbError));
     }
-    throw new Error('Senha incorreta. Verifique os dados digitados.');
+    throw new Error('Usuário ou senha incorretos.');
+  },
+
+  // Tradutor amigável de erros do Firebase Auth
+  translateFirebaseError(error) {
+    if (!error) return 'Ocorreu um erro na autenticação.';
+    const msg = error.message || error.code || String(error);
+
+    if (msg.includes('user-not-found') || msg.includes('wrong-password') || msg.includes('INVALID_LOGIN_CREDENTIALS') || msg.includes('INVALID_PASSWORD')) {
+      return 'Usuário ou senha incorretos.';
+    }
+    if (msg.includes('too-many-requests')) {
+      return 'Muitas tentativas sem sucesso. Aguarde alguns minutos ou redefina sua senha.';
+    }
+    if (msg.includes('user-disabled')) {
+      return 'Esta conta foi desativada pelo administrador.';
+    }
+    if (msg.includes('invalid-email')) {
+      return 'Formato de e-mail inválido.';
+    }
+    if (msg.includes('network-request-failed')) {
+      return 'Falha de conexão com a internet. Verifique sua rede.';
+    }
+
+    return error.message || 'Falha na autenticação. Tente novamente.';
   },
 
   // BUSCA DE CONTA PARA RECUPERAÇÃO (PROCURA POR USUÁRIO OU E-MAIL)
@@ -818,27 +871,14 @@ const AuthManager = {
       await this.saveRecoveryEmail(account, cleanEmail);
     }
 
-    // 3. Garantir registro no Firebase Auth se necessário para entrega do e-mail oficial
-    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && firebaseConfig.apiKey) {
-      try {
-        const restUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`;
-        await fetch(restUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: cleanEmail,
-            password: 'Tmp_' + Math.random().toString(36).substring(2, 10) + '!9X',
-            returnSecureToken: false
-          })
-        });
-      } catch (err) {
-        console.warn('[Auth] Registro auxiliar no Firebase Auth:', err);
-      }
-    }
-
-    // 4. Enviar link oficial de redefinição com segurança oficial do Google
+    // 3. Enviar link oficial de redefinição com segurança oficial do Google
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       try {
+        firebase.auth().languageCode = 'pt';
+      } catch (e) {}
+
+      try {
+        // Envio direto do link oficial de redefinição (200 OK sem disparar erro 400 no console)
         await firebase.auth().sendPasswordResetEmail(cleanEmail);
         console.log('[Auth] Link oficial do Google enviado com sucesso para:', cleanEmail);
         return {
@@ -847,6 +887,33 @@ const AuthManager = {
           account: account
         };
       } catch (fbErr) {
+        // Se a conta ainda não existir no Firebase Auth (código auth/user-not-found), registrar sob demanda
+        if (fbErr && (fbErr.code === 'auth/user-not-found' || (fbErr.message && fbErr.message.includes('user-not-found')))) {
+          console.log('[Auth] Usuário não registrado no Firebase Auth. Criando registro auxiliar...');
+          try {
+            const restUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`;
+            const resp = await fetch(restUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: cleanEmail,
+                password: 'Tmp_' + Math.random().toString(36).substring(2, 10) + '!9X',
+                returnSecureToken: false
+              })
+            });
+            if (resp.ok) {
+              await firebase.auth().sendPasswordResetEmail(cleanEmail);
+              console.log('[Auth] Link oficial do Google enviado após criação para:', cleanEmail);
+              return {
+                success: true,
+                email: cleanEmail,
+                account: account
+              };
+            }
+          } catch (createErr) {
+            console.warn('[Auth] Falha no registro auxiliar:', createErr);
+          }
+        }
         console.warn('[Auth] Erro ao enviar reset email pelo Firebase:', fbErr);
         throw new Error(this.translateFirebaseError(fbErr));
       }
