@@ -434,7 +434,7 @@ const AuthManager = {
     return true;
   },
 
-  // LOGIN (SUPORTA TANTO USUÁRIO SIMPLES QUANTO E-MAIL)
+  // LOGIN (SUPORTA USUÁRIO, E-MAIL E RECOVERY EMAIL COM SINCRONIZAÇÃO AUTOMÁTICA)
   async login(loginInput, password) {
     const rawInput = String(loginInput || '').trim();
     const cleanPass = String(password || '').trim();
@@ -444,114 +444,205 @@ const AuthManager = {
     }
 
     const isMasterAlias = rawInput.toLowerCase() === 'admin' || rawInput.toLowerCase() === 'andrew';
-    let cleanEmail = rawInput.toLowerCase();
     const isEmail = rawInput.includes('@');
+    const cleanLower = rawInput.toLowerCase();
+    const cleanUsername = rawInput.replace(/[^a-zA-Z0-9_.-]/g, '').toLowerCase();
 
-    if (isMasterAlias) {
-      cleanEmail = 'andrew.g.h.agh@gmail.com';
-    } else if (!isEmail) {
-      const cleanUsername = rawInput.replace(/[^a-zA-Z0-9_.-]/g, '').toLowerCase();
-      // Buscar se existe conta com esse username salvo no LocalStorage
-      const localAcc = this.getLocalAccounts().find(a => 
-        (a.username && a.username.toLowerCase() === cleanUsername) ||
-        (a.loginDisplay && a.loginDisplay.toLowerCase() === cleanUsername)
-      );
-      if (localAcc && localAcc.email) {
-        cleanEmail = localAcc.email.toLowerCase();
-      } else {
-        cleanEmail = `${cleanUsername}@hartv.app`;
-      }
-    }
-
-    const isMaster = this.isMasterEmail(cleanEmail) || isMasterAlias;
-
-    // 1. Login via Firebase Auth
-    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
-      try {
-        const cred = await firebase.auth().signInWithEmailAndPassword(cleanEmail, cleanPass);
-        if (cred.user) {
-          let status = 'approved';
-          let role = isMaster ? 'admin' : 'user';
-
-          if (!isMaster) {
-            // Verificar apenas se a conta foi explicitamente bloqueada pelo administrador
-            const check = await this.checkUserApprovalStatus(cred.user.uid, cleanEmail);
-            if (check.status === 'blocked') {
-              await firebase.auth().signOut().catch(() => {});
-              this.currentUser = null;
-              localStorage.removeItem(this.CURRENT_USER_KEY);
-              throw new Error('🚫 Sua conta foi desativada pelo administrador.');
-            }
-            status = 'approved';
+    // 1. Administrador Master
+    if (isMasterAlias || this.isMasterEmail(cleanLower)) {
+      const masterEmail = 'andrew.g.h.agh@gmail.com';
+      if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+        try {
+          const cred = await firebase.auth().signInWithEmailAndPassword(masterEmail, cleanPass);
+          if (cred.user) {
+            this.currentUser = {
+              uid: cred.user.uid,
+              email: cred.user.email,
+              displayName: cred.user.displayName || 'Andrew Harris (Master)',
+              status: 'approved',
+              role: 'admin',
+              isCloud: true
+            };
+            localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
+            this.notifyListeners();
+            return this.currentUser;
           }
-
-          this.currentUser = {
-            uid: cred.user.uid,
-            email: cred.user.email,
-            displayName: cred.user.displayName || rawInput,
-            status: 'approved',
-            role: isMaster ? 'admin' : 'user',
-            isCloud: true
-          };
-          localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
-          this.notifyListeners();
-          return this.currentUser;
+        } catch (e) {
+          console.warn('[Auth] Falha login master via Firebase:', e);
+          const localAcc = this.getLocalAccounts().find(a => this.isMasterEmail(a.email));
+          if (localAcc) {
+            const passMatches = (localAcc.plainPassword && localAcc.plainPassword === cleanPass) ||
+                                (localAcc.passwordHash && localAcc.passwordHash === this.simpleHash(cleanPass));
+            if (passMatches) {
+              this.currentUser = {
+                uid: localAcc.uid || 'usr_master_agh',
+                email: masterEmail,
+                displayName: 'Andrew Harris (Master)',
+                status: 'approved',
+                role: 'admin',
+                isCloud: false
+              };
+              localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
+              this.notifyListeners();
+              return this.currentUser;
+            }
+          }
+          throw new Error('Senha do Administrador incorreta.');
         }
-      } catch (fbErr) {
-        console.warn('[Auth] Falha no login Firebase:', fbErr.code, fbErr.message);
-
-        // Se erro no Firebase, verificar se existe localmente antes de desistir
-        const accounts = this.getLocalAccounts();
-        const account = accounts.find(a => 
-          (a.email && a.email.toLowerCase() === cleanEmail) ||
-          (a.username && a.username.toLowerCase() === rawInput.toLowerCase()) ||
-          (a.loginDisplay && a.loginDisplay.toLowerCase() === rawInput.toLowerCase())
-        );
-
-        if (!account) {
-          throw new Error(this.translateFirebaseError(fbErr));
-        }
-        // Se existe conta local, continua para o fluxo local abaixo
       }
     }
 
-    // 2. Login no Modo Local (ou fallback)
-    const accounts = this.getLocalAccounts();
-    const account = accounts.find(a => 
-      (a.email && a.email.toLowerCase() === cleanEmail) ||
-      (a.username && a.username.toLowerCase() === rawInput.toLowerCase()) ||
-      (a.loginDisplay && a.loginDisplay.toLowerCase() === rawInput.toLowerCase())
+    // 2. Localizar a conta do usuário (no LocalStorage e no Firestore)
+    let account = null;
+    const localAccounts = this.getLocalAccounts();
+    account = localAccounts.find(a => 
+      (a.username && a.username.toLowerCase() === cleanUsername) ||
+      (a.loginDisplay && a.loginDisplay.toLowerCase() === cleanUsername) ||
+      (a.email && a.email.toLowerCase() === cleanLower) ||
+      (a.recoveryEmail && a.recoveryEmail.toLowerCase() === cleanLower)
     );
 
-    if (!account) {
-      throw new Error('Usuário ou e-mail não encontrado.');
-    }
-
-    const passMatches = (account.plainPassword && account.plainPassword === cleanPass) ||
-                        (account.passwordHash && account.passwordHash === this.simpleHash(cleanPass));
-
-    if (!passMatches) {
-      throw new Error('Senha incorreta. Verifique os dados digitados.');
-    }
-
-    if (!isMaster) {
-      if (account.status === 'blocked') {
-        throw new Error('🚫 Sua conta foi desativada pelo administrador.');
+    // Se não encontrou no LocalStorage, buscar no Firestore system_accounts
+    if (!account && typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      try {
+        const db = firebase.firestore();
+        if (cleanUsername) {
+          const docSnap = await db.collection('system_accounts').doc(cleanUsername).get();
+          if (docSnap.exists) account = { uid: docSnap.id, ...docSnap.data() };
+        }
+        if (!account && cleanLower) {
+          const docSnap = await db.collection('system_accounts').doc(cleanLower).get();
+          if (docSnap.exists) account = { uid: docSnap.id, ...docSnap.data() };
+        }
+        if (!account && cleanUsername) {
+          const q = await db.collection('system_accounts').where('username', '==', cleanUsername).limit(1).get();
+          q.forEach(d => { if (d.exists && !account) account = { uid: d.id, ...d.data() }; });
+        }
+        if (!account && cleanLower.includes('@')) {
+          const q = await db.collection('system_accounts').where('recoveryEmail', '==', cleanLower).limit(1).get();
+          q.forEach(d => { if (d.exists && !account) account = { uid: d.id, ...d.data() }; });
+        }
+      } catch (e) {
+        console.warn('[Auth] Aviso ao buscar conta no Firestore:', e);
       }
     }
 
-    this.currentUser = {
-      uid: account.uid,
-      email: account.email,
-      displayName: account.displayName || account.username || rawInput,
-      status: 'approved',
-      role: isMaster ? 'admin' : 'user',
-      isCloud: false
-    };
+    // 3. Montar lista de e-mails candidatos para autenticar no Firebase Auth
+    // Prioriza o recoveryEmail (pois foi onde a senha foi redefinida pelo link do Google!)
+    const candidateEmails = [];
+    if (account && account.recoveryEmail) candidateEmails.push(account.recoveryEmail.toLowerCase());
+    if (account && account.email) candidateEmails.push(account.email.toLowerCase());
+    if (isEmail) candidateEmails.push(cleanLower);
+    if (cleanUsername) candidateEmails.push(`${cleanUsername}@hartv.app`);
 
-    localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
-    this.notifyListeners();
-    return this.currentUser;
+    const uniqueEmails = [...new Set(candidateEmails.filter(e => e && e.includes('@')))];
+
+    let firebaseUser = null;
+    let lastFbError = null;
+
+    // 4. Autenticar no Firebase Auth
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      for (const testEmail of uniqueEmails) {
+        try {
+          const cred = await firebase.auth().signInWithEmailAndPassword(testEmail, cleanPass);
+          if (cred && cred.user) {
+            firebaseUser = cred.user;
+            break;
+          }
+        } catch (err) {
+          lastFbError = err;
+        }
+      }
+
+      if (firebaseUser) {
+        const userUid = account?.uid || firebaseUser.uid;
+        const check = await this.checkUserApprovalStatus(userUid, firebaseUser.email);
+        if (check.status === 'blocked') {
+          await firebase.auth().signOut().catch(() => {});
+          this.currentUser = null;
+          localStorage.removeItem(this.CURRENT_USER_KEY);
+          throw new Error('🚫 Sua conta foi desativada pelo administrador.');
+        }
+
+        // Sincronizar nova senha no Firestore system_accounts
+        const updatePassObj = {
+          plainPassword: cleanPass,
+          updatedAt: new Date().toISOString()
+        };
+        try {
+          const db = firebase.firestore();
+          if (account?.uid) await db.collection('system_accounts').doc(String(account.uid)).set(updatePassObj, { merge: true });
+          if (account?.username) await db.collection('system_accounts').doc(account.username.toLowerCase()).set(updatePassObj, { merge: true });
+          if (firebaseUser.email) await db.collection('system_accounts').doc(firebaseUser.email.toLowerCase()).set(updatePassObj, { merge: true });
+        } catch (e) {
+          console.warn('[Auth] Aviso ao sincronizar nova senha no Firestore:', e);
+        }
+
+        // Sincronizar nova senha no LocalStorage
+        const accounts = this.getLocalAccounts();
+        let foundInLocal = false;
+        accounts.forEach(a => {
+          if ((account?.uid && a.uid === account.uid) || 
+              (account?.username && a.username && a.username.toLowerCase() === account.username.toLowerCase()) ||
+              (a.email && a.email.toLowerCase() === firebaseUser.email.toLowerCase()) ||
+              (a.recoveryEmail && a.recoveryEmail.toLowerCase() === firebaseUser.email.toLowerCase())) {
+            a.plainPassword = cleanPass;
+            a.passwordHash = this.simpleHash(cleanPass);
+            a.email = firebaseUser.email;
+            foundInLocal = true;
+          }
+        });
+        if (!foundInLocal && account) {
+          accounts.push({
+            ...account,
+            plainPassword: cleanPass,
+            passwordHash: this.simpleHash(cleanPass),
+            email: firebaseUser.email
+          });
+        }
+        this.saveLocalAccounts(accounts);
+
+        this.currentUser = {
+          uid: userUid,
+          email: firebaseUser.email,
+          displayName: account?.displayName || account?.username || rawInput,
+          status: 'approved',
+          role: 'user',
+          isCloud: true
+        };
+        localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
+        this.notifyListeners();
+        return this.currentUser;
+      }
+    }
+
+    // 5. Fallback Modo Local (caso Firebase offline ou conta salva localmente)
+    if (account) {
+      const passMatches = (account.plainPassword && account.plainPassword === cleanPass) ||
+                          (account.passwordHash && account.passwordHash === this.simpleHash(cleanPass));
+      if (passMatches) {
+        if (account.status === 'blocked') {
+          throw new Error('🚫 Sua conta foi desativada pelo administrador.');
+        }
+
+        this.currentUser = {
+          uid: account.uid,
+          email: account.email || account.recoveryEmail || `${cleanUsername}@hartv.app`,
+          displayName: account.displayName || account.username || rawInput,
+          status: 'approved',
+          role: 'user',
+          isCloud: false
+        };
+        localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(this.currentUser));
+        this.notifyListeners();
+        return this.currentUser;
+      }
+    }
+
+    if (lastFbError) {
+      throw new Error(this.translateFirebaseError(lastFbError));
+    }
+    throw new Error('Senha incorreta. Verifique os dados digitados.');
   },
 
   // BUSCA DE CONTA PARA RECUPERAÇÃO (PROCURA POR USUÁRIO OU E-MAIL)
@@ -663,6 +754,18 @@ const AuthManager = {
         if (account.username) {
           await db.collection('system_accounts').doc(account.username.toLowerCase()).set(updateObj, { merge: true });
         }
+        // Criar/atualizar documento indexado pelo recoveryEmail apontando para a conta original
+        const fullAccountRecord = {
+          uid: account.uid || 'usr_' + Date.now(),
+          username: account.username || account.loginDisplay || '',
+          displayName: account.displayName || account.username || '',
+          email: cleanEmail,
+          recoveryEmail: cleanEmail,
+          status: 'approved',
+          role: 'user',
+          updatedAt: new Date().toISOString()
+        };
+        await db.collection('system_accounts').doc(cleanEmail).set(fullAccountRecord, { merge: true });
       } catch (e) {
         console.warn('[Auth] Aviso ao salvar recoveryEmail no Firestore:', e);
       }
@@ -677,6 +780,9 @@ const AuthManager = {
       const matchEmail = account.email && a.email && a.email.toLowerCase() === account.email.toLowerCase();
       if (matchUid || matchUser || matchEmail) {
         a.recoveryEmail = cleanEmail;
+        if (!a.email || a.email.endsWith('@hartv.app')) {
+          a.email = cleanEmail;
+        }
         updatedLocal = true;
       }
     });

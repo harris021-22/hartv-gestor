@@ -438,7 +438,7 @@ const App = {
 
     const formForgotPass = document.getElementById('formForgotPass');
     if (formForgotPass) {
-      formForgotPass.addEventListener('submit', (e) => this.handleForgotSubmit(e));
+      formForgotPass.onsubmit = (e) => this.handleForgotSubmit(e);
     }
 
     // Botão Rápido de Usuários no Header (Admin Master)
@@ -1238,11 +1238,15 @@ const App = {
     const sentNotice = document.getElementById('forgotSentEmailNotice');
     const formForgot = document.getElementById('formForgotPass');
 
+    if (this._isSendingForgot) return;
+    this._isSendingForgot = true;
+
     const userVal = userInput ? userInput.value.trim() : '';
     const emailVal = emailInput ? emailInput.value.trim() : '';
 
     if (!userVal || !emailVal) {
       alert('Por favor, informe seu usuário e o e-mail de destino.');
+      this._isSendingForgot = false;
       return;
     }
 
@@ -1271,6 +1275,7 @@ const App = {
     } catch (err) {
       alert(err.message || 'Erro ao enviar link de recuperação. Verifique os dados digitados.');
     } finally {
+      this._isSendingForgot = false;
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalBtn || '<span>Enviar Link Oficial do Google</span>';
