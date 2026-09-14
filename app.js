@@ -1217,7 +1217,7 @@ const App = {
             <span class="cred-label">URL:</span>
             <div class="cred-value-wrap">
               <span class="cred-val" title="${this.escapeHtml(client.url || '')}">${this.escapeHtml(client.url || 'Não informada')}</span>
-              ${client.url ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.url)}', 'URL')" title="Copiar URL">📋</button>` : ''}
+              ${client.url ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.url)}', 'URL')" title="Copiar URL" aria-label="Copiar URL de conexão">📋</button>` : ''}
             </div>
           </div>
 
@@ -1225,7 +1225,7 @@ const App = {
             <span class="cred-label">Usuário:</span>
             <div class="cred-value-wrap">
               <span class="cred-val" style="color: #38bdf8; font-weight: 600;">${this.escapeHtml(client.username || '---')}</span>
-              ${client.username ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.username)}', 'Usuário')" title="Copiar Usuário">📋</button>` : ''}
+              ${client.username ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.username)}', 'Usuário')" title="Copiar Usuário" aria-label="Copiar usuário de acesso">📋</button>` : ''}
             </div>
           </div>
 
@@ -1233,8 +1233,8 @@ const App = {
             <span class="cred-label">Senha:</span>
             <div class="cred-value-wrap">
               <span class="cred-val" id="pwd-${client.id}" style="color: #a855f7; font-weight: 600;">••••••</span>
-              <button class="copy-mini-btn" onclick="App.togglePassword('${client.id}', '${this.escapeJs(client.password || '')}')" title="Mostrar/Ocultar Senha">👁️</button>
-              ${client.password ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.password)}', 'Senha')" title="Copiar Senha">📋</button>` : ''}
+              <button class="copy-mini-btn" onclick="App.togglePassword('${client.id}', '${this.escapeJs(client.password || '')}')" title="Mostrar/Ocultar Senha" aria-label="Mostrar ou ocultar senha">👁️</button>
+              ${client.password ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.password)}', 'Senha')" title="Copiar Senha" aria-label="Copiar senha">📋</button>` : ''}
             </div>
           </div>
 
@@ -1243,7 +1243,7 @@ const App = {
             <span class="cred-label">MAC:</span>
             <div class="cred-value-wrap">
               <span class="cred-val" style="color: #fbbf24; font-weight: 600; font-family: monospace;">${this.escapeHtml(client.mac)}</span>
-              <button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.mac)}', 'MAC')" title="Copiar MAC">📋</button>
+              <button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.mac)}', 'MAC')" title="Copiar MAC" aria-label="Copiar endereço MAC">📋</button>
             </div>
           </div>` : ''}
 
@@ -1252,7 +1252,7 @@ const App = {
             <span class="cred-label">Chave / Key:</span>
             <div class="cred-value-wrap">
               <span class="cred-val" style="color: #34d399; font-weight: 600;">${this.escapeHtml(client.deviceKey || client.key)}</span>
-              <button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.deviceKey || client.key)}', 'Chave')" title="Copiar Chave">📋</button>
+              <button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.deviceKey || client.key)}', 'Chave')" title="Copiar Chave" aria-label="Copiar chave do dispositivo">📋</button>
             </div>
           </div>` : ''}
 
@@ -1260,7 +1260,7 @@ const App = {
             <span class="cred-label">WhatsApp:</span>
             <div class="cred-value-wrap">
               <span class="cred-val">${this.escapeHtml(client.whatsapp || 'Não informado')}</span>
-              ${client.whatsapp ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.whatsapp)}', 'WhatsApp')" title="Copiar WhatsApp">📋</button>` : ''}
+              ${client.whatsapp ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.whatsapp)}', 'WhatsApp')" title="Copiar WhatsApp" aria-label="Copiar número do WhatsApp">📋</button>` : ''}
             </div>
           </div>
         </div>
@@ -1278,19 +1278,19 @@ const App = {
 
         <!-- Ações Rápidas -->
         <div class="card-actions">
-          <button class="action-btn whatsapp-btn" onclick="App.openWhatsAppMenu('${client.id}')">
+          <button class="action-btn whatsapp-btn" onclick="App.openWhatsAppMenu('${client.id}')" aria-label="Abrir menu de WhatsApp para ${this.escapeHtml(client.name)}">
             <span>💬</span>
             <span>WhatsApp</span>
           </button>
-          <button class="action-btn renew-btn" onclick="App.handleQuickRenew('${client.id}')" title="Adicionar 30 dias de sinal">
+          <button class="action-btn renew-btn" onclick="App.handleQuickRenew('${client.id}')" title="Adicionar 30 dias de sinal" aria-label="Renovar assinatura por mais 30 dias">
             <span>⚡</span>
             <span>+30 Dias</span>
           </button>
-          <button class="action-btn" onclick="App.openClientModal('${client.id}')">
+          <button class="action-btn" onclick="App.openClientModal('${client.id}')" aria-label="Editar dados de ${this.escapeHtml(client.name)}">
             <span>✏️</span>
             <span>Editar</span>
           </button>
-          <button class="action-btn danger-action" onclick="App.handleDeleteClient('${client.id}', '${this.escapeJs(client.name)}')">
+          <button class="action-btn danger-action" onclick="App.handleDeleteClient('${client.id}', '${this.escapeJs(client.name)}')" aria-label="Excluir cliente ${this.escapeHtml(client.name)}">
             <span>🗑️</span>
             <span>Excluir</span>
           </button>
