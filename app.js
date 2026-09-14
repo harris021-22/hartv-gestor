@@ -28,7 +28,7 @@ const App = {
       return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
     },
     whatsapp(size = 16) {
-      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
+      return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" style="fill: currentColor; stroke: none;"><path d="M12.04 2c-5.52 0-10 4.48-10 10 0 1.77.46 3.44 1.27 4.89L2 22l5.25-1.28A9.97 9.97 0 0 0 12.04 22c5.52 0 10-4.48 10-10s-4.48-10-10-10zm0 18.25c-1.58 0-3.09-.43-4.39-1.19l-.32-.18-3.26.79.86-3.14-.2-.33A8.2 8.2 0 0 1 3.79 12c0-4.55 3.7-8.25 8.25-8.25s8.25 3.7 8.25 8.25-3.7 8.25-8.25 8.25zm4.51-6.2c-.25-.12-1.46-.72-1.69-.8-.23-.09-.39-.13-.56.12-.16.25-.64.8-.78.97-.15.17-.29.19-.54.06-.25-.12-1.04-.38-1.99-1.23-.74-.65-1.23-1.46-1.38-1.71-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.43.13-.15.17-.25.25-.42.08-.16.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43-.15-.01-.31-.01-.48-.01-.16 0-.43.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.56.13.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.53.6.19 1.14.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.1-.23-.16-.48-.28z"/></svg>`;
     },
     calendar(size = 14) {
       return `<svg class="svg-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>`;
@@ -92,6 +92,7 @@ const App = {
 
   // Inicialização
   init() {
+    this.initTheme();
     this.setupEventListeners();
     this.setupPWAInstall();
     this.setupServiceWorker();
@@ -534,6 +535,21 @@ const App = {
       });
     }
 
+    const drawerItemTheme = document.getElementById('drawerItemTheme');
+    if (drawerItemTheme) {
+      drawerItemTheme.addEventListener('click', () => {
+        this.closeDrawer();
+        this.openThemeModal();
+      });
+    }
+
+    const themeModal = document.getElementById('themeModal');
+    if (themeModal) {
+      themeModal.addEventListener('click', (e) => {
+        if (e.target === themeModal) this.closeThemeModal();
+      });
+    }
+
     const drawerItemCheckExp = document.getElementById('drawerItemCheckExp');
     if (drawerItemCheckExp) {
       drawerItemCheckExp.addEventListener('click', () => {
@@ -576,6 +592,84 @@ const App = {
         }
       }, 300);
     }
+  },
+
+  // Abrir Modal de Temas
+  openThemeModal() {
+    const modal = document.getElementById('themeModal');
+    if (modal) {
+      this.updateThemeModalUI();
+      modal.classList.add('open');
+    }
+  },
+
+  // Fechar Modal de Temas
+  closeThemeModal() {
+    const modal = document.getElementById('themeModal');
+    if (modal) {
+      modal.classList.remove('open');
+    }
+  },
+
+  // Aplicar tema selecionado
+  applyTheme(themeKey, showToast = true) {
+    const validThemes = ['midnight-indigo', 'cyber-cyan', 'mint-tech', 'stealth-onyx'];
+    if (!validThemes.includes(themeKey)) {
+      themeKey = 'midnight-indigo';
+    }
+
+    document.documentElement.setAttribute('data-theme', themeKey);
+    localStorage.setItem('hartv_theme', themeKey);
+
+    // Atualizar cor de tema na meta tag para navegadores e Android PWA
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      const bgColors = {
+        'midnight-indigo': '#090a0f',
+        'cyber-cyan': '#0b0d11',
+        'mint-tech': '#0c0f14',
+        'stealth-onyx': '#09090b'
+      };
+      metaThemeColor.setAttribute('content', bgColors[themeKey] || '#090a0f');
+    }
+
+    // Atualizar badge no menu lateral drawer
+    const themeLabels = {
+      'midnight-indigo': 'Indigo Pro',
+      'cyber-cyan': 'Cyber Cyan',
+      'mint-tech': 'Mint Tech',
+      'stealth-onyx': 'Stealth Onyx'
+    };
+    const drawerThemeBadge = document.getElementById('drawerThemeCurrentBadge');
+    if (drawerThemeBadge) {
+      drawerThemeBadge.textContent = themeLabels[themeKey] || 'Indigo Pro';
+    }
+
+    this.updateThemeModalUI();
+
+    if (showToast) {
+      this.showToast(`Paleta ${themeLabels[themeKey]} ativada!`, 'info');
+    }
+  },
+
+  // Inicializar tema salvo no localStorage
+  initTheme() {
+    const savedTheme = localStorage.getItem('hartv_theme') || 'midnight-indigo';
+    this.applyTheme(savedTheme, false);
+  },
+
+  // Atualizar visual dos cards dentro do modal de temas
+  updateThemeModalUI() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'midnight-indigo';
+    const cards = document.querySelectorAll('.theme-card-option');
+    cards.forEach(card => {
+      const key = card.getAttribute('data-theme-key');
+      if (key === currentTheme) {
+        card.classList.add('active');
+      } else {
+        card.classList.remove('active');
+      }
+    });
   },
 
   // Gerenciamento do estado da autenticação (UI)
