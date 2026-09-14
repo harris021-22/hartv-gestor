@@ -1531,3 +1531,121 @@ body {
 .drawer-logout-btn:active {
   transform: scale(0.98);
 }
+
+/* ========================================================
+   ESTILOS DE GERENCIAMENTO DE USUÁRIOS & CONTAS (ADMIN)
+   ======================================================== */
+.account-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  transition: all 0.2s ease;
+}
+
+.account-item-card:hover {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.account-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.account-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #f8fafc;
+}
+
+.account-email {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.account-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-acc-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.btn-acc-approve {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.btn-acc-approve:hover {
+  background: rgba(16, 185, 129, 0.28);
+  border-color: #10b981;
+}
+
+.btn-acc-block {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+.btn-acc-block:hover {
+  background: rgba(245, 158, 11, 0.28);
+  border-color: #f59e0b;
+}
+
+.btn-acc-delete {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  padding: 6px 8px;
+}
+
+.btn-acc-delete:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.status-pill.approved {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.status-pill.blocked {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}

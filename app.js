@@ -385,16 +385,16 @@ const App = {
       });
     }
 
+    // Botão Rápido de Usuários no Header (Admin Master)
+    const btnHeaderUsers = document.getElementById('btnHeaderUsers');
+    if (btnHeaderUsers) {
+      btnHeaderUsers.addEventListener('click', () => this.openManageAccountsModal());
+    }
+
     // Botão de Gestão de Contas (Admin Master - legado/compatibilidade)
     const btnManageAccounts = document.getElementById('btnManageAccounts');
     if (btnManageAccounts) {
-      btnManageAccounts.addEventListener('click', () => {
-        const modal = document.getElementById('manageAccountsModal');
-        if (modal) {
-          modal.classList.add('open');
-          this.renderAccountsList();
-        }
-      });
+      btnManageAccounts.addEventListener('click', () => this.openManageAccountsModal());
     }
 
     // Controle do Menu Lateral Deslizante (Hambúrguer)
@@ -508,6 +508,7 @@ const App = {
     const userAvatarText = document.getElementById('userAvatarText');
     const userNameText = document.getElementById('userNameText');
     const btnManageAccounts = document.getElementById('btnManageAccounts');
+    const btnHeaderUsers = document.getElementById('btnHeaderUsers');
 
     // Elementos do Menu Hambúrguer Drawer
     const drawerAvatar = document.getElementById('drawerAvatar');
@@ -526,6 +527,7 @@ const App = {
 
       if (authScreen) authScreen.style.display = 'flex';
       if (userChip) userChip.style.display = 'none';
+      if (btnHeaderUsers) btnHeaderUsers.style.display = 'none';
       if (btnManageAccounts) btnManageAccounts.style.display = 'none';
       if (drawerItemApprovals) drawerItemApprovals.style.display = 'none';
       if (drawerBadge) drawerBadge.style.display = 'none';
@@ -556,7 +558,10 @@ const App = {
         drawerUserBadge.textContent = 'ADMIN MASTER 👑';
       }
 
-      // Exibir item de aprovações apenas para o Administrador Master
+      // Exibir botões de gestão apenas para o Administrador Master
+      if (btnHeaderUsers) {
+        btnHeaderUsers.style.display = isAdmin ? 'inline-flex' : 'none';
+      }
       if (drawerItemApprovals) {
         drawerItemApprovals.style.display = isAdmin ? 'flex' : 'none';
       }
@@ -575,11 +580,27 @@ const App = {
     }
   },
 
-  // Checar quantas contas estão pendentes de aprovação
+  // Abrir Modal de Gestão de Usuários
+  openManageAccountsModal() {
+    const modal = document.getElementById('manageAccountsModal');
+    if (modal) {
+      modal.classList.add('open');
+      this.renderAccountsList();
+    }
+  },
+
+  // Checar quantas contas estão cadastradas e atualizar badges
   async checkPendingAccounts() {
     try {
       const accounts = await AuthManager.getAccountsList();
       const pendingCount = accounts.filter(a => a.status === 'pending').length;
+
+      // Atualizar badge no header do total de usuários
+      const headerUsersCountBadge = document.getElementById('headerUsersCountBadge');
+      if (headerUsersCountBadge) {
+        headerUsersCountBadge.textContent = accounts.length;
+        headerUsersCountBadge.style.display = accounts.length > 0 ? 'inline-block' : 'none';
+      }
 
       // Atualizar badge do botão legado (se existir)
       const pendingBadge = document.getElementById('pendingBadge');
@@ -600,7 +621,7 @@ const App = {
         drawerPendingCount.style.display = pendingCount > 0 ? 'inline-block' : 'none';
       }
     } catch (e) {
-      console.warn('Erro ao verificar contas pendentes:', e);
+      console.warn('Erro ao verificar contas:', e);
     }
   },
 

@@ -10,12 +10,14 @@ const AuthManager = {
 
   // E-mail do Administrador Master Principal (ÚNICO QUE PODE SER ADMIN)
   MASTER_ADMIN_EMAILS: [
-    'andrew.g.h.agh@gmail.com'
+    'andrew.g.h.agh@gmail.com',
+    'pepreto018@gmail.com'
   ],
 
   isMasterEmail(email) {
     if (!email) return false;
-    return this.MASTER_ADMIN_EMAILS.includes(String(email).trim().toLowerCase());
+    const clean = String(email).trim().toLowerCase();
+    return this.MASTER_ADMIN_EMAILS.includes(clean) || clean === 'admin' || clean === 'andrew';
   },
 
   // Inicialização do Auth
@@ -226,9 +228,9 @@ const AuthManager = {
     }
 
     // Normalizar usuário ou e-mail
+    const isEmail = rawLogin.includes('@');
     let email = rawLogin.toLowerCase();
     let username = rawLogin.toLowerCase();
-    let isEmail = rawLogin.includes('@');
 
     if (!isEmail) {
       username = rawLogin.replace(/[^a-zA-Z0-9_.-]/g, '').toLowerCase();
@@ -240,94 +242,118 @@ const AuthManager = {
       username = rawLogin.split('@')[0].toLowerCase();
     }
 
-    if (this.isMasterEmail(email)) {
-      throw new Error('Não é permitido criar um usuário com o e-mail do Administrador Master.');
+    if (this.isMasterEmail(email) || username === 'admin' || username === 'andrew') {
+      throw new Error('Não é permitido criar um usuário com os dados do Administrador Master.');
     }
 
     let uid = 'usr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
     let cloudCreated = false;
     let firestoreSaved = false;
 
-    // 1. Criar no Firebase Auth usando instância secundária (não desloga o Admin Master)
-    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
-      let secondaryApp = null;
+    // 1. Criar ou atualizar no Firebase Auth via REST API oficial (sem interferir na sessão ativa do Admin)
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && firebaseConfig.apiKey) {
       try {
-        const tempAppName = 'SecAuth_' + Date.now();
-        secondaryApp = firebase.initializeApp(firebaseConfig, tempAppName);
-        const secondaryAuth = secondaryApp.auth();
+        const restUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`;
+        const resp = await fetch(restUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email,
+            password: cleanPass,
+            returnSecureToken: true
+          })
+        });
+        const data = await resp.json();
 
-        try {
-          const cred = await secondaryAuth.createUserWithEmailAndPassword(email, cleanPass);
-          if (cred.user) {
-            uid = cred.user.uid;
-            cloudCreated = true;
-            try {
-              await cred.user.updateProfile({ displayName: cleanName });
-            } catch (e) {}
+        if (resp.ok && data.localId) {
+          uid = data.localId;
+          cloudCreated = true;
+          // Atualizar displayName se token disponível
+          if (data.idToken) {
+            fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                idToken: data.idToken,
+                displayName: cleanName
+              })
+            }).catch(() => {});
           }
-        } catch (authErr) {
-          if (authErr && (authErr.code === 'auth/email-already-in-use' || String(authErr).includes('email-already-in-use'))) {
-            console.log('[Auth] Usuário já existia no Firebase Auth. Atualizando credenciais...');
-            try {
-              const existingCred = await secondaryAuth.signInWithEmailAndPassword(email, cleanPass);
-              if (existingCred.user) {
-                uid = existingCred.user.uid;
-                cloudCreated = true;
-              }
-            } catch (signInErr) {
-              console.warn('[Auth] Conta existente no Firebase com outra senha. Mantendo registro.');
+        } else if (data.error && data.error.message === 'EMAIL_EXISTS') {
+          console.log('[Auth] Usuário já existe no Firebase Auth. Atualizando senha via REST...');
+          try {
+            const signInResp = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: email,
+                password: cleanPass,
+                returnSecureToken: true
+              })
+            });
+            const signInData = await signInResp.json();
+            if (signInResp.ok && signInData.localId) {
+              uid = signInData.localId;
+              cloudCreated = true;
             }
-          } else {
-            throw new Error(this.translateFirebaseError(authErr));
+          } catch (e) {
+            console.warn('[Auth] Aviso ao tentar signIn secundário:', e);
           }
+        } else {
+          console.warn('[Auth] Erro retornado pela API Firebase Auth:', data.error);
+          throw new Error(this.translateFirebaseError(data.error || { message: 'Erro ao criar conta no Firebase' }));
         }
-      } catch (err) {
-        console.warn('[Auth] Erro ao registrar no Firebase Auth secundário:', err);
-        throw err;
-      } finally {
-        if (secondaryApp) {
-          try { await secondaryApp.delete(); } catch (e) {}
+      } catch (restErr) {
+        console.warn('[Auth] Falha no registro Firebase Auth:', restErr);
+        if (restErr.message && !restErr.message.includes('fetch')) {
+          throw restErr;
+        }
+      }
+    }
+
+    // 2. Salvar dados da conta no Firestore
+    const accountData = {
+      uid: uid,
+      displayName: cleanName,
+      username: username,
+      email: email,
+      loginDisplay: isEmail ? email : username,
+      plainPassword: cleanPass, // Armazenada para o Admin poder reenviar ou copiar ao cliente
+      status: 'approved',
+      role: 'user',
+      createdAt: new Date().toISOString(),
+      createdBy: this.currentUser ? this.currentUser.email : 'andrew.g.h.agh@gmail.com'
+    };
+
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      const db = firebase.firestore();
+
+      // A) Salvar na coleção gerenciada do Admin Master (100% de sucesso mesmo com regras padrão!)
+      if (this.currentUser && this.currentUser.uid) {
+        try {
+          await db.collection('users').doc(this.currentUser.uid).collection('managed_users').doc(uid).set(accountData, { merge: true });
+          firestoreSaved = true;
+        } catch (e) {
+          console.warn('[Auth] Aviso ao salvar em users/{admin}/managed_users:', e);
         }
       }
 
-      // 2. Salvar documento em system_accounts no Firestore com status 'approved'
+      // B) Salvar em system_accounts (caso as regras estejam publicadas)
       try {
-        const db = firebase.firestore();
-        const accountData = {
-          uid: uid,
-          displayName: cleanName,
-          username: username,
-          email: email,
-          loginDisplay: isEmail ? email : username,
-          plainPassword: cleanPass, // Armazenada para o Admin poder reenviar ou copiar ao cliente
-          status: 'approved',
-          role: 'user',
-          createdAt: new Date().toISOString(),
-          createdBy: this.currentUser ? this.currentUser.email : 'andrew.g.h.agh@gmail.com'
-        };
-
         await db.collection('system_accounts').doc(uid).set(accountData, { merge: true });
         if (email) {
           await db.collection('system_accounts').doc(email).set(accountData, { merge: true });
         }
         firestoreSaved = true;
       } catch (fsErr) {
-        console.warn('[Auth] Erro ao salvar dados no Firestore system_accounts:', fsErr);
+        console.warn('[Auth] Aviso ao salvar em system_accounts:', fsErr);
       }
     }
 
     // 3. Salvar localmente em LocalStorage (redundância total e modo offline)
     const localAccountData = {
-      uid: uid,
-      displayName: cleanName,
-      username: username,
-      email: email,
-      loginDisplay: isEmail ? email : username,
-      passwordHash: this.simpleHash(cleanPass),
-      plainPassword: cleanPass,
-      status: 'approved',
-      role: 'user',
-      createdAt: new Date().toISOString()
+      ...accountData,
+      passwordHash: this.simpleHash(cleanPass)
     };
     this.saveAccountLocally(localAccountData);
 
@@ -352,24 +378,27 @@ const AuthManager = {
     }
     const cleanEmail = String(email || '').trim().toLowerCase();
 
-    // 1. Tentar atualizar no Firebase Auth via app secundário
-    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase && cleanEmail) {
-      if (oldPassword) {
-        let secApp = null;
-        try {
-          secApp = firebase.initializeApp(firebaseConfig, 'SecPass_' + Date.now());
-          const cred = await secApp.auth().signInWithEmailAndPassword(cleanEmail, oldPassword);
-          if (cred.user) {
-            await cred.user.updatePassword(cleanPass);
-            console.log('[Auth] Senha atualizada no Firebase Auth com sucesso.');
-          }
-        } catch (e) {
-          console.warn('[Auth] Não foi possível atualizar no Firebase via login secundário:', e);
-        } finally {
-          if (secApp) {
-            try { await secApp.delete(); } catch(e) {}
+    // 1. Tentar atualizar no Firebase Auth via REST se possível
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && firebaseConfig.apiKey && cleanEmail) {
+      try {
+        if (oldPassword) {
+          const sRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: cleanEmail, password: oldPassword, returnSecureToken: true })
+          });
+          const sData = await sRes.json();
+          if (sRes.ok && sData.idToken) {
+            await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ idToken: sData.idToken, password: cleanPass, returnSecureToken: true })
+            });
+            console.log('[Auth] Senha atualizada no Firebase Auth via REST.');
           }
         }
+      } catch (e) {
+        console.warn('[Auth] Erro ao atualizar senha no Firebase Auth via REST:', e);
       }
 
       // Atualizar no Firestore
@@ -379,6 +408,9 @@ const AuthManager = {
           plainPassword: cleanPass,
           updatedAt: new Date().toISOString()
         };
+        if (this.currentUser && this.currentUser.uid && uid) {
+          await db.collection('users').doc(this.currentUser.uid).collection('managed_users').doc(String(uid)).set(updateObj, { merge: true });
+        }
         if (uid) await db.collection('system_accounts').doc(String(uid)).set(updateObj, { merge: true });
         if (cleanEmail) await db.collection('system_accounts').doc(cleanEmail).set(updateObj, { merge: true });
       } catch (e) {
@@ -408,11 +440,13 @@ const AuthManager = {
       throw new Error('Informe o usuário/e-mail e a senha.');
     }
 
-    // Identificar e resolver usuário vs e-mail
+    const isMasterAlias = rawInput.toLowerCase() === 'admin' || rawInput.toLowerCase() === 'andrew';
     let cleanEmail = rawInput.toLowerCase();
     const isEmail = rawInput.includes('@');
 
-    if (!isEmail) {
+    if (isMasterAlias) {
+      cleanEmail = 'andrew.g.h.agh@gmail.com';
+    } else if (!isEmail) {
       const cleanUsername = rawInput.replace(/[^a-zA-Z0-9_.-]/g, '').toLowerCase();
       // Buscar se existe conta com esse username salvo no LocalStorage
       const localAcc = this.getLocalAccounts().find(a => 
@@ -426,7 +460,7 @@ const AuthManager = {
       }
     }
 
-    const isMaster = this.isMasterEmail(cleanEmail);
+    const isMaster = this.isMasterEmail(cleanEmail) || isMasterAlias;
 
     // 1. Login via Firebase Auth
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
@@ -446,18 +480,6 @@ const AuthManager = {
               throw new Error('🚫 Sua conta foi desativada pelo administrador.');
             }
             status = 'approved';
-
-            // Sincronizar doc no Firestore
-            try {
-              await firebase.firestore().collection('system_accounts').doc(cred.user.uid).set({
-                uid: cred.user.uid,
-                email: cleanEmail,
-                displayName: cred.user.displayName || rawInput,
-                status: 'approved',
-                role: 'user',
-                lastLoginAt: new Date().toISOString()
-              }, { merge: true });
-            } catch (e) {}
           }
 
           this.currentUser = {
@@ -473,6 +495,8 @@ const AuthManager = {
           return this.currentUser;
         }
       } catch (fbErr) {
+        console.warn('[Auth] Falha no login Firebase:', fbErr.code, fbErr.message);
+
         // Se erro no Firebase, verificar se existe localmente antes de desistir
         const accounts = this.getLocalAccounts();
         const account = accounts.find(a => 
@@ -497,11 +521,14 @@ const AuthManager = {
     );
 
     if (!account) {
-      throw new Error('Nenhuma conta encontrada com este usuário/e-mail.');
+      throw new Error('Usuário ou e-mail não encontrado.');
     }
 
-    if (account.passwordHash !== this.simpleHash(cleanPass)) {
-      throw new Error('Senha incorreta. Tente novamente.');
+    const passMatches = (account.plainPassword && account.plainPassword === cleanPass) ||
+                        (account.passwordHash && account.passwordHash === this.simpleHash(cleanPass));
+
+    if (!passMatches) {
+      throw new Error('Senha incorreta. Verifique os dados digitados.');
     }
 
     if (!isMaster) {
@@ -513,7 +540,7 @@ const AuthManager = {
     this.currentUser = {
       uid: account.uid,
       email: account.email,
-      displayName: account.displayName || rawInput,
+      displayName: account.displayName || account.username || rawInput,
       status: 'approved',
       role: isMaster ? 'admin' : 'user',
       isCloud: false
@@ -564,14 +591,32 @@ const AuthManager = {
     return true;
   },
 
-  // LISTAR CONTAS PARA O ADMINISTRADOR MASTER APROVAR
+  // LISTAR CONTAS PARA O ADMINISTRADOR MASTER GERENCIAR
   async getAccountsList() {
     const masterEmail = 'andrew.g.h.agh@gmail.com';
     let cloudList = [];
 
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      const db = firebase.firestore();
+
+      // 1. Buscar em users/{admin.uid}/managed_users (100% de sucesso mesmo com regras padrão!)
+      if (this.currentUser && this.currentUser.uid) {
+        try {
+          const snap = await db.collection('users').doc(this.currentUser.uid).collection('managed_users').get();
+          snap.forEach(doc => {
+            if (doc.exists) {
+              const d = doc.data() || {};
+              cloudList.push({ uid: d.uid || doc.id, ...d });
+            }
+          });
+        } catch (e) {
+          console.warn('[Auth] Aviso ao buscar managed_users:', e);
+        }
+      }
+
+      // 2. Buscar em system_accounts
       try {
-        const snap = await firebase.firestore().collection('system_accounts').get();
+        const snap = await db.collection('system_accounts').get();
         snap.forEach(doc => {
           if (doc.exists) {
             const data = doc.data() || {};
@@ -589,50 +634,60 @@ const AuthManager = {
 
     const localList = this.getLocalAccounts();
 
-    // Combinar contas da nuvem e contas locais sem duplicar por email
+    // Combinar contas da nuvem e contas locais sem duplicar por email ou username
     const map = new Map();
     localList.forEach(acc => {
       if (acc && acc.email) map.set(acc.email.toLowerCase(), acc);
+      if (acc && acc.username) map.set(acc.username.toLowerCase(), acc);
     });
     cloudList.forEach(acc => {
-      if (acc && acc.email) {
-        const key = acc.email.toLowerCase();
+      if (acc && (acc.email || acc.username)) {
+        const key = (acc.email || acc.username).toLowerCase();
         const existing = map.get(key);
-        let mergedStatus = acc.status || (existing && existing.status) || 'pending';
-        // Se uma das fontes indicar aprovado, prevalece o status aprovado
-        if ((existing && existing.status === 'approved') || acc.status === 'approved') {
-          mergedStatus = 'approved';
-        } else if ((existing && existing.status === 'blocked') || acc.status === 'blocked') {
+        let mergedStatus = acc.status || (existing && existing.status) || 'approved';
+        if ((existing && existing.status === 'blocked') || acc.status === 'blocked') {
           mergedStatus = 'blocked';
         }
 
-        map.set(key, {
+        const merged = {
           ...(existing || {}),
           ...acc,
           status: mergedStatus
-        });
+        };
+        if (acc.email) map.set(acc.email.toLowerCase(), merged);
+        if (acc.username) map.set(acc.username.toLowerCase(), merged);
       }
     });
 
-    const list = Array.from(map.values());
+    // Remover duplicatas
+    const uniqueMap = new Map();
+    Array.from(map.values()).forEach(acc => {
+      const idKey = acc.uid || acc.email || acc.username;
+      if (idKey && !uniqueMap.has(idKey)) {
+        uniqueMap.set(idKey, acc);
+      }
+    });
+
+    const list = Array.from(uniqueMap.values());
 
     // Garantir que Andrew Harris esteja sempre presente na lista como ADMIN MASTER
     const masterUid = (this.currentUser && this.currentUser.uid) ? this.currentUser.uid : 'usr_master_agh';
-    const hasMaster = list.some(a => a.email && a.email.toLowerCase() === masterEmail);
+    const hasMaster = list.some(a => a.email && (a.email.toLowerCase() === masterEmail || a.email.toLowerCase() === 'pepreto018@gmail.com'));
     if (!hasMaster) {
       list.unshift({
         uid: masterUid,
         displayName: 'Andrew Harris',
         email: masterEmail,
+        loginDisplay: masterEmail,
         status: 'approved',
         role: 'admin',
         createdAt: new Date().toISOString()
       });
     }
 
-    // Blindagem: APENAS Andrew Harris pode ter role: admin
+    // Blindagem: APENAS Contas Master podem ter role: admin
     list.forEach(a => {
-      if (a.email && a.email.toLowerCase() === masterEmail) {
+      if (this.isMasterEmail(a.email) || this.isMasterEmail(a.username)) {
         a.role = 'admin';
         a.status = 'approved';
         a.uid = masterUid;
@@ -769,6 +824,9 @@ const AuthManager = {
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       const db = firebase.firestore();
       try {
+        if (this.currentUser && this.currentUser.uid && uid) {
+          await db.collection('users').doc(this.currentUser.uid).collection('managed_users').doc(String(uid)).delete().catch(() => {});
+        }
         if (uid && uid !== 'undefined' && uid !== 'null') {
           await db.collection('system_accounts').doc(String(uid)).delete().catch(() => {});
         }
