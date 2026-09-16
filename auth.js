@@ -190,6 +190,22 @@ const AuthManager = {
         }
       }
 
+      // 2.1 Tentar por Username como ID do documento
+      if (!foundStatus && cleanEmail) {
+        const usernamePart = cleanEmail.includes('@') ? cleanEmail.split('@')[0] : cleanEmail;
+        if (usernamePart) {
+          try {
+            const docSnap = await db.collection('system_accounts').doc(usernamePart).get();
+            if (docSnap.exists) {
+              const data = docSnap.data();
+              if (data && data.status) {
+                foundStatus = data.status;
+              }
+            }
+          } catch (e) {}
+        }
+      }
+
       // 3. Tentar por query onde email == cleanEmail
       if (!foundStatus && cleanEmail) {
         try {
@@ -402,9 +418,15 @@ const AuthManager = {
         }
       }
 
-      // B) Salvar em system_accounts (apenas no documento canônico uid para evitar duplicatas)
+      // B) Salvar em system_accounts (no UID canônico e também por username/email para redundância total)
       try {
         await db.collection('system_accounts').doc(uid).set(accountData, { merge: true });
+        if (username) {
+          await db.collection('system_accounts').doc(username).set(accountData, { merge: true });
+        }
+        if (email) {
+          await db.collection('system_accounts').doc(email).set(accountData, { merge: true });
+        }
         firestoreSaved = true;
       } catch (fsErr) {
         console.warn('[Auth] Aviso ao salvar em system_accounts:', fsErr);
@@ -1238,6 +1260,12 @@ const AuthManager = {
             if (doc.exists) {
               const d = doc.data() || {};
               cloudList.push({ uid: d.uid || doc.id, ...d });
+              // Auto-sincronizar com system_accounts para garantir acesso em qualquer dispositivo
+              if (d.uid && d.status) {
+                db.collection('system_accounts').doc(d.uid).set(d, { merge: true }).catch(() => {});
+                if (d.username) db.collection('system_accounts').doc(d.username).set(d, { merge: true }).catch(() => {});
+                if (d.email) db.collection('system_accounts').doc(d.email).set(d, { merge: true }).catch(() => {});
+              }
             }
           });
         } catch (e) {

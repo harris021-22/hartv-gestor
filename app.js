@@ -113,7 +113,7 @@ const App = {
   // Registrar Service Worker
   setupServiceWorker() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=34')
+      navigator.serviceWorker.register('./sw.js?v=35')
         .then((reg) => {
           console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
           reg.update().catch(() => {});
