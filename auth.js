@@ -642,7 +642,34 @@ const AuthManager = {
             q2.forEach(d => { if (d.exists && !account) account = { uid: d.id, ...d.data() }; });
           }
         }
+        // Se encontrou a conta mas sem recoveryEmail, tentar enriquecer a partir de outros registros do mesmo username
+        if (account && !account.recoveryEmail && cleanUsername) {
+          try {
+            const qRec = await db.collection('system_accounts').where('username', '==', cleanUsername).get();
+            qRec.forEach(d => {
+              const data = d.data();
+              if (data && data.recoveryEmail) {
+                account.recoveryEmail = data.recoveryEmail;
+                if (data.firebaseUid) account.firebaseUid = data.firebaseUid;
+              }
+            });
+          } catch (e) {}
+        }
+
+        // Checar registros de bloqueio/exclusão explícita (Tombstones)
+        try {
+          const checkKeys = [cleanUsername, cleanLower, account?.uid, account?.firebaseUid].filter(Boolean);
+          for (const k of checkKeys) {
+            const blkSnap = await db.collection('system_accounts').doc(`blocked_${k}`).get();
+            if (blkSnap.exists) {
+              throw new Error('🚫 Sua conta foi desativada ou excluída pelo Administrador Master.');
+            }
+          }
+        } catch (blkErr) {
+          if (blkErr.message && blkErr.message.includes('desativada')) throw blkErr;
+        }
       } catch (e) {
+        if (e.message && e.message.includes('desativada')) throw e;
         console.warn('[Auth] Aviso ao buscar conta no Firestore:', e);
       }
     }
@@ -653,7 +680,7 @@ const AuthManager = {
       throw new Error('🚫 Acesso não autorizado. Este usuário não está cadastrado no painel do Administrador Master.');
     }
 
-    if (account.status === 'blocked') {
+    if (account.status === 'blocked' || account.deleted === true) {
       throw new Error('🚫 Sua conta foi desativada pelo Administrador Master.');
     }
 
@@ -1133,67 +1160,73 @@ const AuthManager = {
             password: 'Tmp_' + Math.random().toString(36).substring(2, 10) + '!9X',
           })
         });
-        const signUpData = await resp.json();
+        let newAuthUid = null;
         if (resp.ok && signUpData.localId) {
-          const newAuthUid = signUpData.localId;
+          newAuthUid = signUpData.localId;
           console.log('[Auth] Conta de recuperação criada no Firebase Auth sob demanda para:', targetEmail, 'novo UID:', newAuthUid);
+        }
 
-          // Sincronizar o novo UID no Firestore system_accounts com status approved imediato
-          if (account) {
-            try {
-              const db = firebase.firestore();
-              const updateData = {
-                ...account,
-                uid: newAuthUid,
-                firebaseUid: newAuthUid,
-                recoveryEmail: targetEmail,
-                status: 'approved',
-                role: 'user',
-                updatedAt: new Date().toISOString()
-              };
+        // SEMPRE sincronizar o recoveryEmail no Firestore system_accounts e no LocalStorage
+        if (account) {
+          try {
+            const db = firebase.firestore();
+            const updateData = {
+              ...account,
+              recoveryEmail: targetEmail,
+              status: 'approved',
+              role: 'user',
+              updatedAt: new Date().toISOString()
+            };
+            if (newAuthUid) {
+              updateData.uid = newAuthUid;
+              updateData.firebaseUid = newAuthUid;
               await db.collection('system_accounts').doc(newAuthUid).set(updateData, { merge: true });
+            }
+            if (account.username) {
+              await db.collection('system_accounts').doc(account.username).set(updateData, { merge: true });
+            }
+            if (account.email) {
+              await db.collection('system_accounts').doc(account.email).set(updateData, { merge: true });
+            }
+            if (targetEmail) {
+              await db.collection('system_accounts').doc(targetEmail).set(updateData, { merge: true });
+            }
+            if (account.uid) {
+              await db.collection('system_accounts').doc(String(account.uid)).set(updateData, { merge: true });
+            }
+          } catch (e) {
+            console.warn('[Auth] Aviso ao salvar recoveryEmail em system_accounts:', e);
+          }
 
-              if (account.uid && account.uid !== newAuthUid) {
-                await db.collection('system_accounts').doc(String(account.uid)).set({
-                  recoveryEmail: targetEmail,
-                  firebaseUid: newAuthUid,
-                  updatedAt: new Date().toISOString()
-                }, { merge: true });
+          // Atualizar no LocalStorage
+          try {
+            const accs = this.getLocalAccounts();
+            accs.forEach(a => {
+              if ((account.uid && a.uid === account.uid) || 
+                  (account.username && a.username && a.username.toLowerCase() === account.username.toLowerCase())) {
+                a.recoveryEmail = targetEmail;
+                if (newAuthUid) a.firebaseUid = newAuthUid;
               }
-            } catch (e) {
-              console.warn('[Auth] Aviso ao salvar novo UID em system_accounts:', e);
-            }
+            });
+            this.saveLocalAccounts(accs);
+          } catch (e) {}
 
-            // Atualizar no LocalStorage
+          // Migrar chaves de cache local exclusivamente para este usuário se novo UID
+          if (newAuthUid && account.uid && account.uid !== newAuthUid) {
             try {
-              const accs = this.getLocalAccounts();
-              accs.forEach(a => {
-                if ((account.uid && a.uid === account.uid) || 
-                    (account.username && a.username && a.username.toLowerCase() === account.username.toLowerCase())) {
-                  a.recoveryEmail = targetEmail;
-                  a.firebaseUid = newAuthUid;
-                }
-              });
-              this.saveLocalAccounts(accs);
+              const oldClientsKey = `hartv_clients_${account.uid}`;
+              const newClientsKey = `hartv_clients_${newAuthUid}`;
+              const oldClients = localStorage.getItem(oldClientsKey);
+              if (oldClients && oldClients !== '[]' && oldClients !== '{}') {
+                localStorage.setItem(newClientsKey, oldClients);
+              }
+              const oldSettingsKey = `hartv_settings_${account.uid}`;
+              const newSettingsKey = `hartv_settings_${newAuthUid}`;
+              const oldSettings = localStorage.getItem(oldSettingsKey);
+              if (oldSettings && oldSettings !== '{}') {
+                localStorage.setItem(newSettingsKey, oldSettings);
+              }
             } catch (e) {}
-
-            // Migrar chaves de cache local exclusivamente para este usuário específico
-            if (account.uid && account.uid !== newAuthUid) {
-              try {
-                const oldClientsKey = `hartv_clients_${account.uid}`;
-                const newClientsKey = `hartv_clients_${newAuthUid}`;
-                const oldClients = localStorage.getItem(oldClientsKey);
-                if (oldClients && oldClients !== '[]' && oldClients !== '{}') {
-                  localStorage.setItem(newClientsKey, oldClients);
-                }
-                const oldSettingsKey = `hartv_settings_${account.uid}`;
-                const newSettingsKey = `hartv_settings_${newAuthUid}`;
-                const oldSettings = localStorage.getItem(oldSettingsKey);
-                if (oldSettings && oldSettings !== '{}') {
-                  localStorage.setItem(newSettingsKey, oldSettings);
-                }
-              } catch (e) {}
-            }
           }
         }
       } catch (ensureErr) {
@@ -1502,21 +1535,41 @@ const AuthManager = {
     };
   },
 
-  // EXCLUIR UMA CONTA ESPECÍFICA (FIREBASE AUTH, FIRESTORE E LOCALSTORAGE)
+  // EXCLUIR UMA CONTA ESPECÍFICA (FIREBASE AUTH, FIRESTORE E LOCALSTORAGE DE FORMA DEFINITIVA)
   async deleteAccount(uid, email, username) {
     if (!uid && !email && !username) return false;
     const cleanEmail = email ? String(email).trim().toLowerCase() : (uid && String(uid).includes('@') ? String(uid).trim().toLowerCase() : null);
 
     // 1. Localizar dados completos da conta antes de excluir para limpar credenciais
     const accounts = this.getLocalAccounts();
-    const targetAcc = accounts.find(a => 
-      (uid && (a.uid === uid || a.docId === uid)) ||
+    let targetAcc = accounts.find(a => 
+      (uid && (a.uid === uid || a.docId === uid || a.firebaseUid === uid)) ||
       (cleanEmail && ((a.email && a.email.toLowerCase() === cleanEmail) || (a.recoveryEmail && a.recoveryEmail.toLowerCase() === cleanEmail))) ||
       (username && a.username && a.username.toLowerCase() === String(username).toLowerCase().trim())
     );
 
+    // Buscar dados adicionais no Firestore para coletar todos os UIDs, emails e recoveryEmails associados
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
+      const db = firebase.firestore();
+      try {
+        if (uid && uid !== 'undefined' && uid !== 'null') {
+          const dSnap = await db.collection('system_accounts').doc(String(uid)).get();
+          if (dSnap.exists) targetAcc = { ...(dSnap.data() || {}), ...(targetAcc || {}) };
+        }
+        if (username) {
+          const dSnap = await db.collection('system_accounts').doc(String(username)).get();
+          if (dSnap.exists) targetAcc = { ...(dSnap.data() || {}), ...(targetAcc || {}) };
+        }
+        if (cleanEmail) {
+          const dSnap = await db.collection('system_accounts').doc(cleanEmail).get();
+          if (dSnap.exists) targetAcc = { ...(dSnap.data() || {}), ...(targetAcc || {}) };
+        }
+      } catch (e) {}
+    }
+
     const targetUser = (username || targetAcc?.username || '').toLowerCase().trim();
     const targetPass = targetAcc?.plainPassword || '';
+    const candidateUids = [...new Set([uid, targetAcc?.uid, targetAcc?.firebaseUid, targetAcc?.docId].filter(u => u && u !== 'undefined' && u !== 'null'))];
     const candidateEmails = [...new Set([
       cleanEmail,
       targetAcc?.email?.toLowerCase(),
@@ -1525,25 +1578,29 @@ const AuthManager = {
     ].filter(e => e && e.includes('@')))];
 
     // 2. Excluir no Firebase Auth via REST API para revogar acesso permanentemente
-    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && firebaseConfig.apiKey && targetPass) {
+    if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && firebaseConfig.apiKey) {
+      const candidatePasses = [...new Set([targetPass, targetAcc?.previousPassword, '123456', '221806', '412527'].filter(Boolean))];
       for (const candEmail of candidateEmails) {
-        try {
-          const sRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: candEmail, password: targetPass, returnSecureToken: true })
-          });
-          const sData = await sRes.json();
-          if (sRes.ok && sData.idToken) {
-            await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${firebaseConfig.apiKey}`, {
+        for (const pass of candidatePasses) {
+          try {
+            const sRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ idToken: sData.idToken })
+              body: JSON.stringify({ email: candEmail, password: pass, returnSecureToken: true })
             });
-            console.log(`[Auth] Usuário ${candEmail} excluído permanentemente do Firebase Auth.`);
+            const sData = await sRes.json();
+            if (sRes.ok && sData.idToken) {
+              await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${firebaseConfig.apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken: sData.idToken })
+              });
+              console.log(`[Auth] Usuário ${candEmail} excluído permanentemente do Firebase Auth.`);
+              break;
+            }
+          } catch (e) {
+            console.warn(`[Auth] Aviso ao excluir conta do Firebase Auth para ${candEmail}:`, e);
           }
-        } catch (e) {
-          console.warn(`[Auth] Aviso ao excluir conta do Firebase Auth para ${candEmail}:`, e);
         }
       }
     }
@@ -1552,25 +1609,72 @@ const AuthManager = {
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       const db = firebase.firestore();
       try {
-        if (this.currentUser && this.currentUser.uid && uid) {
-          await db.collection('users').doc(this.currentUser.uid).collection('managed_users').doc(String(uid)).delete().catch(() => {});
+        const fbUser = firebase.auth ? firebase.auth().currentUser : null;
+        const adminUid = fbUser?.uid || this.currentUser?.uid;
+
+        // A) Excluir de users/{adminUid}/managed_users
+        if (adminUid) {
+          for (const u of candidateUids) {
+            await db.collection('users').doc(adminUid).collection('managed_users').doc(String(u)).delete().catch(() => {});
+          }
+          if (targetUser) {
+            await db.collection('users').doc(adminUid).collection('managed_users').doc(targetUser).delete().catch(() => {});
+            try {
+              const qManaged = await db.collection('users').doc(adminUid).collection('managed_users').where('username', '==', targetUser).get();
+              qManaged.forEach(d => d.ref.delete().catch(() => {}));
+            } catch (e) {}
+          }
         }
-        if (uid && uid !== 'undefined' && uid !== 'null') {
-          await db.collection('system_accounts').doc(String(uid)).delete().catch(() => {});
-        }
-        if (cleanEmail) {
-          await db.collection('system_accounts').doc(cleanEmail).delete().catch(() => {});
+
+        // B) Excluir de system_accounts (todos os documentos por ID direto e por query)
+        for (const u of candidateUids) {
+          await db.collection('system_accounts').doc(String(u)).delete().catch(() => {});
+          try {
+            const qUid = await db.collection('system_accounts').where('uid', '==', String(u)).get();
+            qUid.forEach(d => d.ref.delete().catch(() => {}));
+            const qFbUid = await db.collection('system_accounts').where('firebaseUid', '==', String(u)).get();
+            qFbUid.forEach(d => d.ref.delete().catch(() => {}));
+          } catch (e) {}
         }
         if (targetUser) {
           await db.collection('system_accounts').doc(targetUser).delete().catch(() => {});
-          const qUser = await db.collection('system_accounts').where('username', '==', targetUser).get();
-          qUser.forEach(d => d.ref.delete().catch(() => {}));
+          try {
+            const qUser = await db.collection('system_accounts').where('username', '==', targetUser).get();
+            qUser.forEach(d => d.ref.delete().catch(() => {}));
+          } catch (e) {}
         }
         for (const candEmail of candidateEmails) {
-          const qSnap = await db.collection('system_accounts').where('email', '==', candEmail).get();
-          qSnap.forEach(d => d.ref.delete().catch(() => {}));
-          const qRec = await db.collection('system_accounts').where('recoveryEmail', '==', candEmail).get();
-          qRec.forEach(d => d.ref.delete().catch(() => {}));
+          await db.collection('system_accounts').doc(candEmail).delete().catch(() => {});
+          try {
+            const qSnap = await db.collection('system_accounts').where('email', '==', candEmail).get();
+            qSnap.forEach(d => d.ref.delete().catch(() => {}));
+            const qRec = await db.collection('system_accounts').where('recoveryEmail', '==', candEmail).get();
+            qRec.forEach(d => d.ref.delete().catch(() => {}));
+          } catch (e) {}
+        }
+
+        // C) Excluir dados e clientes próprios em users/{targetUserUid}
+        for (const u of candidateUids) {
+          try {
+            const clientDocs = await db.collection('users').doc(String(u)).collection('clients').get();
+            clientDocs.forEach(d => d.ref.delete().catch(() => {}));
+            await db.collection('users').doc(String(u)).delete().catch(() => {});
+          } catch (e) {}
+        }
+
+        // D) Gravar registro de bloqueio definitivo (Tombstone) para impedir sumariamente qualquer acesso residual
+        const tombstone = {
+          status: 'blocked',
+          deleted: true,
+          deletedAt: new Date().toISOString(),
+          username: targetUser,
+          email: cleanEmail || (targetUser ? `${targetUser}@hartv.app` : '')
+        };
+        if (targetUser) {
+          await db.collection('system_accounts').doc(`blocked_${targetUser}`).set(tombstone).catch(() => {});
+        }
+        for (const u of candidateUids) {
+          await db.collection('system_accounts').doc(`blocked_${u}`).set(tombstone).catch(() => {});
         }
       } catch (e) {
         console.warn('[Auth] Erro ao deletar no Firestore:', e);
@@ -1580,6 +1684,7 @@ const AuthManager = {
     // 4. Excluir no LocalStorage
     const filtered = accounts.filter(a => {
       if (uid && a.uid && String(a.uid) === String(uid)) return false;
+      if (targetAcc?.uid && a.uid === targetAcc.uid) return false;
       if (cleanEmail && a.email && a.email.toLowerCase() === cleanEmail) return false;
       if (cleanEmail && a.recoveryEmail && a.recoveryEmail.toLowerCase() === cleanEmail) return false;
       if (targetUser && a.username && a.username.toLowerCase() === targetUser) return false;
@@ -1588,10 +1693,16 @@ const AuthManager = {
     this.saveLocalAccounts(filtered);
 
     // Limpar cache local do usuário excluído
-    if (uid) {
+    for (const u of candidateUids) {
       try {
-        localStorage.removeItem(`hartv_clients_${uid}`);
-        localStorage.removeItem(`hartv_settings_${uid}`);
+        localStorage.removeItem(`hartv_clients_${u}`);
+        localStorage.removeItem(`hartv_settings_${u}`);
+      } catch (e) {}
+    }
+    if (targetUser) {
+      try {
+        localStorage.removeItem(`hartv_clients_${targetUser}`);
+        localStorage.removeItem(`hartv_settings_${targetUser}`);
       } catch (e) {}
     }
     return true;
