@@ -160,7 +160,7 @@ const AuthManager = {
     if (typeof isFirebaseConfigured === 'function' && isFirebaseConfigured() && window.firebase) {
       const db = firebase.firestore();
 
-      // 1. Tentar por UID no Firestore
+      // 1. Tentar por UID canônico no Firestore
       if (uid && uid !== 'undefined' && uid !== 'null') {
         try {
           const docSnap = await db.collection('system_accounts').doc(String(uid)).get();
@@ -206,11 +206,51 @@ const AuthManager = {
           console.warn('[Auth] Aviso ao buscar status por query email:', e);
         }
       }
+
+      // 3.1 Tentar por query onde recoveryEmail == cleanEmail
+      if (!foundStatus && cleanEmail) {
+        try {
+          const qSnap = await db.collection('system_accounts').where('recoveryEmail', '==', cleanEmail).get();
+          qSnap.forEach(d => {
+            const data = d.data();
+            if (data && data.status === 'blocked') {
+              foundStatus = 'blocked';
+            } else if (!foundStatus && data && data.status) {
+              foundStatus = data.status;
+            }
+          });
+        } catch (e) {
+          console.warn('[Auth] Aviso ao buscar status por recoveryEmail:', e);
+        }
+      }
+
+      // 3.2 Tentar por query onde firebaseUid == uid
+      if (!foundStatus && uid && uid !== 'undefined' && uid !== 'null') {
+        try {
+          const qUid = await db.collection('system_accounts').where('firebaseUid', '==', String(uid)).get();
+          qUid.forEach(d => {
+            const data = d.data();
+            if (data && data.status === 'blocked') {
+              foundStatus = 'blocked';
+            } else if (!foundStatus && data && data.status) {
+              foundStatus = data.status;
+            }
+          });
+        } catch (e) {
+          console.warn('[Auth] Aviso ao buscar status por firebaseUid:', e);
+        }
+      }
     }
 
     // 4. Fallback no LocalStorage
-    if (!foundStatus && cleanEmail) {
-      const localAcc = this.getLocalAccounts().find(a => (a.email && a.email.toLowerCase() === cleanEmail) || (uid && a.uid === uid));
+    if (!foundStatus && (cleanEmail || uid)) {
+      const localAcc = this.getLocalAccounts().find(a => 
+        (cleanEmail && (
+          (a.email && a.email.toLowerCase() === cleanEmail) || 
+          (a.recoveryEmail && a.recoveryEmail.toLowerCase() === cleanEmail)
+        )) || 
+        (uid && (a.uid === uid || a.firebaseUid === uid || a.docId === uid))
+      );
       if (localAcc && localAcc.status) {
         foundStatus = localAcc.status;
       }
@@ -542,8 +582,11 @@ const AuthManager = {
     // 2. Localizar a conta do usuário (no LocalStorage e no Firestore)
     let account = null;
     const localAccounts = this.getLocalAccounts();
+    const emailPrefix = isEmail ? cleanLower.split('@')[0].replace(/[^a-zA-Z0-9_.-]/g, '') : cleanUsername;
+
     account = localAccounts.find(a => 
       (a.username && a.username.toLowerCase() === cleanUsername) ||
+      (emailPrefix && a.username && a.username.toLowerCase() === emailPrefix) ||
       (a.loginDisplay && a.loginDisplay.toLowerCase() === cleanUsername) ||
       (a.email && a.email.toLowerCase() === cleanLower) ||
       (a.recoveryEmail && a.recoveryEmail.toLowerCase() === cleanLower)
@@ -565,9 +608,17 @@ const AuthManager = {
           const q = await db.collection('system_accounts').where('username', '==', cleanUsername).limit(1).get();
           q.forEach(d => { if (d.exists && !account) account = { uid: d.id, ...d.data() }; });
         }
-        if (!account && cleanLower.includes('@')) {
-          const q = await db.collection('system_accounts').where('recoveryEmail', '==', cleanLower).limit(1).get();
+        if (!account && emailPrefix) {
+          const q = await db.collection('system_accounts').where('username', '==', emailPrefix).limit(1).get();
           q.forEach(d => { if (d.exists && !account) account = { uid: d.id, ...d.data() }; });
+        }
+        if (!account && cleanLower.includes('@')) {
+          const q1 = await db.collection('system_accounts').where('email', '==', cleanLower).limit(1).get();
+          q1.forEach(d => { if (d.exists && !account) account = { uid: d.id, ...d.data() }; });
+          if (!account) {
+            const q2 = await db.collection('system_accounts').where('recoveryEmail', '==', cleanLower).limit(1).get();
+            q2.forEach(d => { if (d.exists && !account) account = { uid: d.id, ...d.data() }; });
+          }
         }
       } catch (e) {
         console.warn('[Auth] Aviso ao buscar conta no Firestore:', e);
@@ -662,7 +713,28 @@ const AuthManager = {
         // O UID da sessão ativa DEVE ser o firebaseUid para cumprir a regra de segurança do Firestore
         const userUid = firebaseUid;
 
-        const check = await this.checkUserApprovalStatus(userUid, firebaseUser.email);
+        let check = await this.checkUserApprovalStatus(userUid, firebaseUser.email);
+
+        // Auto-reconciliação caso o UID tenha sido renovado pelo Google após recuperação
+        if (check.status !== 'approved' && account && account.status === 'approved') {
+          console.log('[Auth] Auto-reconciliando status aprovado com novo Firebase UID:', userUid);
+          check = { status: 'approved', role: 'user' };
+          try {
+            const db = firebase.firestore();
+            await db.collection('system_accounts').doc(userUid).set({
+              ...account,
+              uid: userUid,
+              firebaseUid: userUid,
+              recoveryEmail: firebaseUser.email || account.recoveryEmail || '',
+              status: 'approved',
+              role: 'user',
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+          } catch (e) {
+            console.warn('[Auth] Aviso ao auto-reconciliar conta no Firestore:', e);
+          }
+        }
+
         if (check.status !== 'approved') {
           await firebase.auth().signOut().catch(() => {});
           this.currentUser = null;
@@ -1041,16 +1113,65 @@ const AuthManager = {
         });
         const signUpData = await resp.json();
         if (resp.ok && signUpData.localId) {
-          console.log('[Auth] Conta de recuperação criada no Firebase Auth sob demanda para:', targetEmail);
-          if (account?.uid && account.uid !== signUpData.localId) {
+          const newAuthUid = signUpData.localId;
+          console.log('[Auth] Conta de recuperação criada no Firebase Auth sob demanda para:', targetEmail, 'novo UID:', newAuthUid);
+
+          // Sincronizar o novo UID no Firestore system_accounts com status approved imediato
+          if (account) {
             try {
-              const oldClientsKey = `hartv_clients_${account.uid}`;
-              const newClientsKey = `hartv_clients_${signUpData.localId}`;
-              const oldClients = localStorage.getItem(oldClientsKey);
-              if (oldClients && oldClients !== '[]') {
-                localStorage.setItem(newClientsKey, oldClients);
+              const db = firebase.firestore();
+              const updateData = {
+                ...account,
+                uid: newAuthUid,
+                firebaseUid: newAuthUid,
+                recoveryEmail: targetEmail,
+                status: 'approved',
+                role: 'user',
+                updatedAt: new Date().toISOString()
+              };
+              await db.collection('system_accounts').doc(newAuthUid).set(updateData, { merge: true });
+
+              if (account.uid && account.uid !== newAuthUid) {
+                await db.collection('system_accounts').doc(String(account.uid)).set({
+                  recoveryEmail: targetEmail,
+                  firebaseUid: newAuthUid,
+                  updatedAt: new Date().toISOString()
+                }, { merge: true });
               }
+            } catch (e) {
+              console.warn('[Auth] Aviso ao salvar novo UID em system_accounts:', e);
+            }
+
+            // Atualizar no LocalStorage
+            try {
+              const accs = this.getLocalAccounts();
+              accs.forEach(a => {
+                if ((account.uid && a.uid === account.uid) || 
+                    (account.username && a.username && a.username.toLowerCase() === account.username.toLowerCase())) {
+                  a.recoveryEmail = targetEmail;
+                  a.firebaseUid = newAuthUid;
+                }
+              });
+              this.saveLocalAccounts(accs);
             } catch (e) {}
+
+            // Migrar chaves de cache local exclusivamente para este usuário específico
+            if (account.uid && account.uid !== newAuthUid) {
+              try {
+                const oldClientsKey = `hartv_clients_${account.uid}`;
+                const newClientsKey = `hartv_clients_${newAuthUid}`;
+                const oldClients = localStorage.getItem(oldClientsKey);
+                if (oldClients && oldClients !== '[]' && oldClients !== '{}') {
+                  localStorage.setItem(newClientsKey, oldClients);
+                }
+                const oldSettingsKey = `hartv_settings_${account.uid}`;
+                const newSettingsKey = `hartv_settings_${newAuthUid}`;
+                const oldSettings = localStorage.getItem(oldSettingsKey);
+                if (oldSettings && oldSettings !== '{}') {
+                  localStorage.setItem(newSettingsKey, oldSettings);
+                }
+              } catch (e) {}
+            }
           }
         }
       } catch (ensureErr) {

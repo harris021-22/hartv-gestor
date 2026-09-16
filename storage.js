@@ -37,20 +37,34 @@ const StorageManager = {
     try {
       const key = this.getSettingsKey();
       let data = localStorage.getItem(key);
-      
-      // Fallback para legado se ainda não tiver na chave do usuário
-      if (!data) {
+      const currentUser = typeof AuthManager !== 'undefined' ? AuthManager.getUser() : null;
+      const isMaster = currentUser && typeof AuthManager.isMasterEmail === 'function' && AuthManager.isMasterEmail(currentUser.email);
+
+      // Fallback para legado apenas se for conta Master ou guest inicial
+      if (!data && (isMaster || key === 'hartv_settings_guest')) {
         data = localStorage.getItem(this.LEGACY_SETTINGS_KEY);
       }
 
-      if (!data) return { ...this.defaultSettings };
+      // Se for novo usuário (não-master) sem configurações salvas, inicia com campos Pix limpos
+      if (!data) {
+        if (!isMaster && key !== 'hartv_settings_guest') {
+          return {
+            ...this.defaultSettings,
+            pixKey: '',
+            pixName: '',
+            pixBank: ''
+          };
+        }
+        return { ...this.defaultSettings };
+      }
+
       const parsed = JSON.parse(data);
       return {
         ...this.defaultSettings,
         ...parsed,
-        pixKey: parsed.pixKey || this.defaultSettings.pixKey,
-        pixName: parsed.pixName || this.defaultSettings.pixName,
-        pixBank: parsed.pixBank || this.defaultSettings.pixBank
+        pixKey: parsed.pixKey !== undefined ? parsed.pixKey : (isMaster ? this.defaultSettings.pixKey : ''),
+        pixName: parsed.pixName !== undefined ? parsed.pixName : (isMaster ? this.defaultSettings.pixName : ''),
+        pixBank: parsed.pixBank !== undefined ? parsed.pixBank : (isMaster ? this.defaultSettings.pixBank : '')
       };
     } catch (e) {
       console.error('Erro ao ler configurações:', e);
@@ -76,43 +90,19 @@ const StorageManager = {
     }
   },
 
-  // Obter todos os clientes (isolados pelo usuário ativo)
+  // Obter todos os clientes (rigorosamente isolados pelo usuário ativo)
   getClients() {
     try {
       const key = this.getClientsKey();
-      let data = localStorage.getItem(key);
+      const data = localStorage.getItem(key);
 
-      // Se a chave atual estiver vazia ou com lista vazia [], recuperar de outras chaves locais
-      const isEmpty = !data || data === '[]' || data === '{}';
-      if (isEmpty && key !== 'hartv_clients_guest') {
-        // 1. Tentar dados legados
-        const legacyData = localStorage.getItem(this.LEGACY_CLIENTS_KEY);
-        if (legacyData && legacyData !== '[]') {
-          localStorage.setItem(key, legacyData);
-          data = legacyData;
-        } else {
-          // 2. Procurar em qualquer outra chave hartv_clients_* que possua clientes salvos
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k && k.startsWith('hartv_clients_') && k !== key && k !== 'hartv_clients_guest') {
-              const candidate = localStorage.getItem(k);
-              if (candidate && candidate !== '[]' && candidate !== '{}') {
-                try {
-                  const parsed = JSON.parse(candidate);
-                  if (Array.isArray(parsed) && parsed.length > 0) {
-                    console.log(`[Storage] Preservando ${parsed.length} cliente(s) da chave anterior "${k}" para "${key}"`);
-                    localStorage.setItem(key, candidate);
-                    data = candidate;
-                    break;
-                  }
-                } catch (e) {}
-              }
-            }
-          }
-        }
+      // Isolamento total: novos usuários começam com lista 100% vazia
+      if (!data || data === '[]' || data === '{}') {
+        return [];
       }
 
-      return data ? JSON.parse(data) : [];
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
       console.error('Erro ao ler clientes do LocalStorage:', e);
       return [];

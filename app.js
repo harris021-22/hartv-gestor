@@ -113,7 +113,7 @@ const App = {
   // Registrar Service Worker
   setupServiceWorker() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js?v=33')
+      navigator.serviceWorker.register('./sw.js?v=34')
         .then((reg) => {
           console.log('[PWA] Service Worker registrado com sucesso:', reg.scope);
           reg.update().catch(() => {});
@@ -821,6 +821,12 @@ const App = {
       }
 
       const res = await AuthManager.createUserByAdmin(name, login, pass);
+
+      // Garantir isolamento absoluto: assegurar que novo usuário inicie com lista vazia no LocalStorage
+      if (res && res.user && res.user.uid) {
+        localStorage.removeItem(`hartv_clients_${res.user.uid}`);
+        localStorage.removeItem(`hartv_settings_${res.user.uid}`);
+      }
 
       const loginDisplay = res.loginDisplay || login;
       const appUrl = window.location.origin && window.location.origin !== 'null' ? window.location.origin : 'https://hartv-gestor.web.app';

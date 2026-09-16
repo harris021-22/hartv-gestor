@@ -664,15 +664,15 @@
           <!-- Card de E-mail Fixo e Mascarado (Usuário Já Possui E-mail Cadastrado) -->
           <div id="forgotLockedBox" style="display: none; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.28); border-radius: var(--radius-sm); padding: 12px 14px; margin-top: 4px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
-              <span style="font-size: 0.76rem; color: #34d399; font-weight: 700; display: flex; align-items: center; gap: 5px;">
+              <span style="font-size: 0.8rem; color: #34d399; font-weight: 700; display: flex; align-items: center; gap: 5px;">
                 <span>🔒 E-mail Vinculado (Fixo)</span>
               </span>
-              <span style="font-size: 0.68rem; background: rgba(16, 185, 129, 0.2); color: #a7f3d0; padding: 2px 7px; border-radius: 9999px; font-weight: 700;">Protegido</span>
+              <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.2); color: #a7f3d0; padding: 3px 8px; border-radius: 9999px; font-weight: 700;">Protegido</span>
             </div>
             <div id="forgotMaskedDisplay" style="font-family: monospace; font-size: 1.05rem; font-weight: 700; color: #ffffff; letter-spacing: 0.04em; padding: 8px 0 4px;">
               ...
             </div>
-            <div style="font-size: 0.73rem; color: var(--text-muted); line-height: 1.35;">
+            <div style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
               O link oficial do Google será enviado diretamente para este endereço. Por privacidade e segurança, o e-mail não pode ser alterado nem visualizado por completo.
             </div>
           </div>
@@ -681,7 +681,7 @@
           <div class="form-group" id="forgotEmailGroup" style="margin-top: 4px;">
             <label class="form-label" for="forgotEmailInput">Cadastrar E-mail para Receber o Link</label>
             <input type="email" id="forgotEmailInput" class="form-input" placeholder="seuemail@exemplo.com" autocomplete="email">
-            <span id="forgotEmailHelp" style="font-size: 0.74rem; color: var(--text-dim); line-height: 1.3;">
+            <span id="forgotEmailHelp" style="font-size: 0.8rem; color: var(--text-dim); line-height: 1.35;">
               Este e-mail ficará salvo vinculado à sua conta para suas próximas recuperações.
             </span>
           </div>
@@ -697,18 +697,18 @@
             <span class="recovery-check-icon">✓</span>
             <div>
               <div style="font-weight: 700; color: #ffffff; font-size: 0.95rem;">Link Oficial Enviado!</div>
-              <div id="forgotSentEmailNotice" style="font-size: 0.78rem; color: #a7f3d0; margin-top: 2px;">
+              <div id="forgotSentEmailNotice" style="font-size: 0.8rem; color: #a7f3d0; margin-top: 2px;">
                 Verifique a caixa de entrada de seu e-mail
               </div>
             </div>
           </div>
-          <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; margin-top: 10px;">
+          <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; margin-top: 10px;">
             Enviamos o link seguro do Google para o seu e-mail cadastrado. Acesse sua caixa de entrada e clique no link para redefinir sua senha com segurança.
           </p>
-          <div style="font-size: 0.74rem; color: #fbbf24; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px; padding: 8px 10px; margin-top: 8px; line-height: 1.4;">
+          <div style="font-size: 0.8rem; color: #fbbf24; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px; padding: 8px 10px; margin-top: 8px; line-height: 1.4;">
             💡 <strong>Dica importante:</strong> Se não encontrar na caixa de entrada principal dentro de 1 minuto, verifique a pasta de <strong>Spam / Lixo Eletrônico</strong> do seu provedor de e-mail.
           </div>
-          <div style="font-size: 0.73rem; color: #93c5fd; background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 6px; padding: 8px 10px; margin-top: 8px; line-height: 1.35;">
+          <div style="font-size: 0.8rem; color: #93c5fd; background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 6px; padding: 8px 10px; margin-top: 8px; line-height: 1.35;">
             💬 <strong>Não recebeu o e-mail?</strong> O Administrador Master pode redefinir ou fornecer seus dados de acesso diretamente pelo painel administrativo.
           </div>
           <button type="button" class="btn btn-primary" onclick="App.showLoginView()" style="width: 100%; justify-content: center; padding: 11px; margin-top: 12px;">
@@ -1008,11 +1008,11 @@ service cloud.firestore {
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <!-- Scripts da Aplicação -->
-  <script src="./firebase-config.js?v=33"></script>
-  <script src="./auth.js?v=33"></script>
-  <script src="./database.js?v=33"></script>
-  <script src="./storage.js?v=33"></script>
-  <script src="./notifications.js?v=33"></script>
-  <script src="./app.js?v=33"></script>
+  <script src="./firebase-config.js?v=34"></script>
+  <script src="./auth.js?v=34"></script>
+  <script src="./database.js?v=34"></script>
+  <script src="./storage.js?v=34"></script>
+  <script src="./notifications.js?v=34"></script>
+  <script src="./app.js?v=34"></script>
 </body>
 </html>
