@@ -1649,7 +1649,7 @@ const App = {
           <div class="credential-item">
             <span class="cred-label">Usuário:</span>
             <div class="cred-value-wrap">
-              <span class="cred-val" style="color: #60a5fa; font-weight: 600;">${this.escapeHtml(client.username || '---')}</span>
+              <span class="cred-val cred-val-user">${this.escapeHtml(client.username || '---')}</span>
               ${client.username ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.username)}', 'Usuário', this)" title="Copiar Usuário" aria-label="Copiar usuário de acesso">${this.Icons.copy(14)}</button>` : ''}
             </div>
           </div>
@@ -1657,7 +1657,7 @@ const App = {
           <div class="credential-item">
             <span class="cred-label">Senha:</span>
             <div class="cred-value-wrap">
-              <span class="cred-val" id="pwd-${client.id}" style="color: #93c5fd; font-weight: 600; letter-spacing: 0.08em;">••••••••</span>
+              <span class="cred-val cred-val-pwd" id="pwd-${client.id}">••••••••</span>
               <button class="copy-mini-btn" id="pwd-btn-${client.id}" onclick="App.togglePassword('${client.id}', '${this.escapeJs(client.password || '')}', this)" title="Mostrar Senha" aria-label="Mostrar ou ocultar senha">${this.Icons.eyeOff(15)}</button>
               ${client.password ? `<button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.password)}', 'Senha', this)" title="Copiar Senha" aria-label="Copiar senha">${this.Icons.copy(14)}</button>` : ''}
             </div>
@@ -1667,7 +1667,7 @@ const App = {
           <div class="credential-item">
             <span class="cred-label">MAC:</span>
             <div class="cred-value-wrap">
-              <span class="cred-val" style="color: #fbbf24; font-weight: 600; font-family: monospace;">${this.escapeHtml(client.mac)}</span>
+              <span class="cred-val cred-val-mac">${this.escapeHtml(client.mac)}</span>
               <button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.mac)}', 'MAC', this)" title="Copiar MAC" aria-label="Copiar endereço MAC">${this.Icons.copy(14)}</button>
             </div>
           </div>` : ''}
@@ -1676,7 +1676,7 @@ const App = {
           <div class="credential-item">
             <span class="cred-label">Chave / Key:</span>
             <div class="cred-value-wrap">
-              <span class="cred-val" style="color: #34d399; font-weight: 600;">${this.escapeHtml(client.deviceKey || client.key)}</span>
+              <span class="cred-val cred-val-key">${this.escapeHtml(client.deviceKey || client.key)}</span>
               <button class="copy-mini-btn" onclick="App.copyToClipboard('${this.escapeJs(client.deviceKey || client.key)}', 'Chave', this)" title="Copiar Chave" aria-label="Copiar chave do dispositivo">${this.Icons.copy(14)}</button>
             </div>
           </div>` : ''}
